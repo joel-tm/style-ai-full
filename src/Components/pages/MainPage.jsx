@@ -3,45 +3,56 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function MainPage() {
-  const navigate = useNavigate(); // ✅ INSIDE component
+  const navigate = useNavigate();
+  const userName = localStorage.getItem("userName") || "User";
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userEmail");
+    navigate("/Login");
+  };
 
   return (
     <div style={containerStyle}>
-    {/* Header */}
-    <div style={mainTitle}>
-      <h1 style={mainTitleStyle}>Welcome to Your Style Dashboard</h1>
-    </div>
-   
-    <div style={pageStyle}>
-      {/* Heading */}
-      <h1 style={titleStyle}>Choose what you want</h1>
-
-      {/* Options */}
-      <div style={optionsContainer}>
-        {/* Left */}
-        <div
-          style={cardStyle}
-          onClick={() => navigate("/create-outfit")}
-        >
-          <h2 style={cardTitle}>Create Outfit</h2>
-          <p style={cardText}>
-            Let AI style the perfect outfit for you
-          </p>
+      {/* Header */}
+      <div style={mainTitle}>
+        <div style={headerRow}>
+          <h1 style={mainTitleStyle}>Welcome, {userName} 👋</h1>
+          <button onClick={handleLogout} style={logoutBtn}>Logout</button>
         </div>
+      </div>
 
-        {/* Right */}
-        <div
-          style={cardStyle}
-          onClick={() => navigate("/wardrobe")}
-        >
-          <h2 style={cardTitle}>My Wardrobe</h2>
-          <p style={cardText}>
-            View and manage your saved clothes
-          </p>
+      <div style={pageStyle}>
+        {/* Heading */}
+        <h1 style={titleStyle}>Choose what you want</h1>
+
+        {/* Options */}
+        <div style={optionsContainer}>
+          {/* Left */}
+          <div
+            style={cardStyle}
+            onClick={() => navigate("/create-outfit")}
+          >
+            <h2 style={cardTitle}>Create Outfit</h2>
+            <p style={cardText}>
+              Let AI style the perfect outfit for you
+            </p>
+          </div>
+
+          {/* Right */}
+          <div
+            style={cardStyle}
+            onClick={() => navigate("/wardrobe")}
+          >
+            <h2 style={cardTitle}>My Wardrobe</h2>
+            <p style={cardText}>
+              View and manage your saved clothes
+            </p>
+          </div>
         </div>
       </div>
     </div>
-     </div>
   );
 }
 const containerStyle = {
@@ -52,9 +63,28 @@ const containerStyle = {
 
 const mainTitle = {
   backgroundColor: "black",
-  padding: "30px 0px",
+  padding: "30px 40px",
   marginBottom: "0px",
   textAlign: "center",
+};
+
+const headerRow = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  maxWidth: "1200px",
+  margin: "0 auto",
+  width: "100%",
+};
+
+const logoutBtn = {
+  background: "transparent",
+  border: "1px solid #fff",
+  color: "#fff",
+  padding: "8px 20px",
+  borderRadius: "8px",
+  fontSize: "14px",
+  cursor: "pointer",
 };
 
 const mainTitleStyle = {

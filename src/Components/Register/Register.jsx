@@ -21,7 +21,7 @@ export default function Register() {
     });
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     const { name, email, password } = formData;
 
     if (!name || !email || !password) {
@@ -30,11 +30,28 @@ export default function Register() {
     }
 
     setError("");
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-    localStorage.setItem("userEmail", email);
-    localStorage.setItem("userName", name);
+      const data = await res.json();
 
-    navigate("/Profession");
+      if (!res.ok) {
+        setError(data.detail || "Registration failed");
+        return;
+      }
+
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("userEmail", data.user.email);
+      localStorage.setItem("userName", data.user.name);
+
+      navigate("/Profession");/*the page to navigate after login in*/
+    } catch (err) {
+      setError("Server error. Please try again.", err);
+    }
   };
 
   return (
@@ -71,8 +88,8 @@ export default function Register() {
         <button onClick={handleRegister}>Register</button>
 
         <p
-         onClick={() => navigate("/Login")}
-         className="switch-text">
+          onClick={() => navigate("/Login")}
+          className="switch-text">
           Already have an account? Login
         </p>
       </div>

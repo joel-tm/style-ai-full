@@ -10,19 +10,38 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleLogin = () => {
-   
+  const handleLogin = async () => {
+
 
     if (!email || !password) {
       setError("Please enter email and password");
       return;
     }
 
-    
-      setError("");
-      
+
+    setError("");
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.detail || "Login failed");
+        return;
+      }
+
+      localStorage.setItem("token", data.access_token);
+      localStorage.setItem("userEmail", data.user.email);
+      localStorage.setItem("userName", data.user.name);
+
       navigate("/home");
-   
+    } catch (err) {
+      setError("Server error. Please try again.");
+    }
   };
 
   return (
