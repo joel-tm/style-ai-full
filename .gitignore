@@ -28,3 +28,4 @@ venv1/
 __pycache__/
 *.pyc
 *.db
+uploads/

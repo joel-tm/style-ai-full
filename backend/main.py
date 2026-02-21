@@ -1,14 +1,25 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+import os
 
 from database import engine, Base, get_db
 from models import User
 from schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
 from auth import hash_password, verify_password, create_access_token
 
-# --- Create tables ---
+# Import wardrobe model so its table gets created
+from wardrobe.models import WardrobeItem  # noqa: F401
+from wardrobe.routes import router as wardrobe_router
+
+# --- Create all tables ---
 Base.metadata.create_all(bind=engine)
+
+# --- Uploads directory ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # --- App ---
 app = FastAPI(title="Style-AI Backend", version="1.0.0")
@@ -22,8 +33,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Serve uploaded images ---
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
-# --- Routes ---
+# --- Include routers ---
+app.include_router(wardrobe_router)
+
+
+# --- Auth Routes ---
 
 @app.post("/api/register", response_model=TokenResponse)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
