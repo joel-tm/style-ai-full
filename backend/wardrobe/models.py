@@ -10,4 +10,5 @@ class WardrobeItem(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     category = Column(String, nullable=False, index=True)
     filename = Column(String, nullable=False)
+    bg_removed_filename = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
