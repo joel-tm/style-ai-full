@@ -110,7 +110,7 @@
 //   cursor: "pointer",
 //   boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
 // };
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 
 const CATEGORIES = ["Tops", "Bottoms", "Dresses", "Footwear", "Accessories"];
 
@@ -118,7 +118,6 @@ export default function MyWardrobe() {
   const fileInputRef = useRef(null);
 
   const [activeCategory, setActiveCategory] = useState("Tops");
-
   const [wardrobe, setWardrobe] = useState({
     Tops: [],
     Bottoms: [],
@@ -127,20 +126,89 @@ export default function MyWardrobe() {
     Accessories: [],
   });
 
+  const token = localStorage.getItem("token");
+
+  // Fetch wardrobe items from backend on mount
+  useEffect(() => {
+    if (!token) return;
+
+    fetch("/api/wardrobe", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((items) => {
+        const grouped = {
+          Tops: [],
+          Bottoms: [],
+          Dresses: [],
+          Footwear: [],
+          Accessories: [],
+        };
+        items.forEach((item) => {
+          if (grouped[item.category]) {
+            grouped[item.category].push(item);
+          }
+        });
+        setWardrobe(grouped);
+      })
+      .catch((err) => console.error("Failed to load wardrobe:", err));
+  }, []);
+
   const openFileExplorer = () => {
     fileInputRef.current.click();
   };
 
-  const handleUpload = (e) => {
+  const handleUpload = async (e) => {
     const files = Array.from(e.target.files);
-    const newImages = files.map((file) =>
-      URL.createObjectURL(file)
-    );
+    if (!files.length) return;
 
-    setWardrobe((prev) => ({
-      ...prev,
-      [activeCategory]: [...prev[activeCategory], ...newImages],
-    }));
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("category", activeCategory);
+
+      try {
+        const res = await fetch("/api/wardrobe", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+
+        if (!res.ok) {
+          console.error("Upload failed");
+          continue;
+        }
+
+        const item = await res.json();
+        setWardrobe((prev) => ({
+          ...prev,
+          [item.category]: [...prev[item.category], item],
+        }));
+      } catch (err) {
+        console.error("Upload error:", err);
+      }
+    }
+
+    // Reset input so same file can be uploaded again
+    e.target.value = "";
+  };
+
+  const handleDelete = async (itemId, category) => {
+    try {
+      const res = await fetch(`/api/wardrobe/${itemId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        setWardrobe((prev) => ({
+          ...prev,
+          [category]: prev[category].filter((item) => item.id !== itemId),
+        }));
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
   };
 
   return (
@@ -172,9 +240,15 @@ export default function MyWardrobe() {
 
       {/* Image Grid */}
       <div style={gridStyle}>
-        {wardrobe[activeCategory].map((img, index) => (
-          <div key={index} style={cardStyle}>
-            <img src={img} alt="wardrobe" style={imageStyle} />
+        {wardrobe[activeCategory].map((item) => (
+          <div key={item.id} style={cardStyle}>
+            <img src={item.image_url} alt="wardrobe" style={imageStyle} />
+            <button
+              onClick={() => handleDelete(item.id, activeCategory)}
+              style={deleteBtnStyle}
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>
@@ -247,6 +321,25 @@ const cardStyle = {
   borderRadius: "14px",
   padding: "12px",
   boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+  position: "relative",
+};
+
+const deleteBtnStyle = {
+  position: "absolute",
+  top: "16px",
+  right: "16px",
+  background: "rgba(0, 0, 0, 0.6)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "50%",
+  width: "28px",
+  height: "28px",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  fontSize: "18px",
+  lineHeight: "1",
 };
 
 const imageStyle = {
