@@ -1,25 +1,31 @@
 
 import React, { useState, useMemo } from "react";
-import { Input, Select, Button } from "antd";
-import { Country, City } from "country-state-city";
+import { Input, Select, Button, DatePicker } from "antd";
+import { Country, State } from "country-state-city";
 import "antd/dist/reset.css";
 
 const { Option } = Select;
+
+const ALLOWED_COUNTRIES = ["AE", "SA", "TH", "US", "SG", "GB", "MY", "ID", "VN", "HK"];
 
 export default function CreateOutfit() {
   const [occasion, setOccasion] = useState("");
   const [country, setCountry] = useState(null);
   const [place, setPlace] = useState("");
-  
- 
-  const cities = useMemo(() => {
+  const [date, setDate] = useState(null);
+
+  const allowedCountries = useMemo(() => {
+    return Country.getAllCountries().filter(c => ALLOWED_COUNTRIES.includes(c.isoCode));
+  }, []);
+
+  const states = useMemo(() => {
     if (!country) return [];
-    const allCities = City.getCitiesOfCountry(country);
+    const allStates = State.getStatesOfCountry(country);
     const seen = new Set();
 
-    return allCities.filter((city) => {
-      if (seen.has(city.name)) return false;
-      seen.add(city.name);
+    return allStates.filter((state) => {
+      if (seen.has(state.name)) return false;
+      seen.add(state.name);
       return true;
     });
   }, [country]);
@@ -29,7 +35,7 @@ export default function CreateOutfit() {
       occasion,
       country,
       place,
-    
+      date: date ? date.format("YYYY-MM-DD") : null,
     };
 
     console.log("Generate outfit with:", outfitData);
@@ -43,7 +49,7 @@ export default function CreateOutfit() {
           Tell us a little more and we’ll style you perfectly
         </p>
 
-       
+
         <div style={fieldStyle}>
           <label style={labelStyle}>Occasion</label>
           <Input
@@ -68,7 +74,7 @@ export default function CreateOutfit() {
             optionFilterProp="children"
             getPopupContainer={(node) => node.parentNode}
           >
-            {Country.getAllCountries().map((c) => (
+            {allowedCountries.map((c) => (
               <Option key={c.isoCode} value={c.isoCode}>
                 {c.name}
               </Option>
@@ -76,11 +82,11 @@ export default function CreateOutfit() {
           </Select>
         </div>
 
-        {/* City */}
+        {/* State/Region */}
         <div style={fieldStyle}>
-          <label style={labelStyle}>City</label>
+          <label style={labelStyle}>State / Region</label>
           <Select
-            placeholder="Select city"
+            placeholder="Select state"
             value={place}
             onChange={(value) => setPlace(value)}
             style={{ width: "100%" }}
@@ -89,18 +95,29 @@ export default function CreateOutfit() {
             optionFilterProp="children"
             getPopupContainer={(node) => node.parentNode}
           >
-            {cities.map((city) => (
+            {states.map((state) => (
               <Option
-                key={`${city.name}-${city.latitude}-${city.longitude}`}
-                value={city.name}
+                key={`${state.name}-${state.isoCode}`}
+                value={state.name}
               >
-                {city.name}
+                {state.name}
               </Option>
             ))}
           </Select>
         </div>
 
-        
+        {/* Optional Date */}
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Date <span style={{ color: "#888", fontWeight: "normal" }}>(Optional)</span></label>
+          <DatePicker
+            style={{ width: "100%" }}
+            value={date}
+            onChange={(val) => setDate(val)}
+            placeholder="Select a date"
+            getPopupContainer={(node) => node.parentNode}
+          />
+        </div>
+
         <Button
           type="primary"
           block
