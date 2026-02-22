@@ -126,6 +126,10 @@ export default function MyWardrobe() {
     Accessories: [],
   });
 
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [viewModes, setViewModes] = useState({}); // { id: 'clean' | 'original' }
+
   const token = localStorage.getItem("token");
 
   // Fetch wardrobe items from backend on mount
@@ -153,6 +157,11 @@ export default function MyWardrobe() {
       })
       .catch((err) => console.error("Failed to load wardrobe:", err));
   }, []);
+
+  // Clear selections when switching categories
+  useEffect(() => {
+    setSelectedItems([]);
+  }, [activeCategory]);
 
   const openFileExplorer = () => {
     fileInputRef.current.click();
@@ -205,10 +214,77 @@ export default function MyWardrobe() {
           ...prev,
           [category]: prev[category].filter((item) => item.id !== itemId),
         }));
+        setSelectedItems((prev) => prev.filter((id) => id !== itemId));
       }
     } catch (err) {
       console.error("Delete error:", err);
     }
+  };
+
+  const handleSelect = (itemId) => {
+    setSelectedItems((prev) =>
+      prev.includes(itemId)
+        ? prev.filter((id) => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const handleRemoveBackground = async () => {
+    if (selectedItems.length === 0) return;
+    setIsProcessing(true);
+
+    try {
+      const res = await fetch("/api/wardrobe/remove-background", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ item_ids: selectedItems }),
+      });
+
+      if (res.ok) {
+        const updatedItems = await res.json();
+
+        // Update local state for each updated item
+        setWardrobe((prev) => {
+          const next = { ...prev };
+          const itemsMap = {};
+          updatedItems.forEach((u) => { itemsMap[u.id] = u; });
+
+          next[activeCategory] = next[activeCategory].map((item) =>
+            itemsMap[item.id] ? itemsMap[item.id] : item
+          );
+          return next;
+        });
+
+        // Auto view the clean versions
+        setViewModes((prev) => {
+          const next = { ...prev };
+          updatedItems.forEach(item => {
+            if (item.bg_removed_image_url) {
+              next[item.id] = "clean";
+            }
+          });
+          return next;
+        });
+
+        setSelectedItems([]); // Clear selection after processing
+      } else {
+        console.error("Batch processing failed");
+      }
+    } catch (err) {
+      console.error("Batch processing error:", err);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const toggleViewMode = (itemId) => {
+    setViewModes((prev) => ({
+      ...prev,
+      [itemId]: prev[itemId] === "original" ? "clean" : "original"
+    }));
   };
 
   return (
@@ -240,17 +316,72 @@ export default function MyWardrobe() {
 
       {/* Image Grid */}
       <div style={gridStyle}>
-        {wardrobe[activeCategory].map((item) => (
-          <div key={item.id} style={cardStyle}>
-            <img src={item.image_url} alt="wardrobe" style={imageStyle} />
-            <button
-              onClick={() => handleDelete(item.id, activeCategory)}
-              style={deleteBtnStyle}
-            >
-              ×
-            </button>
-          </div>
-        ))}
+        {wardrobe[activeCategory].map((item) => {
+          const isSelected = selectedItems.includes(item.id);
+          const hasClean = !!item.bg_removed_image_url;
+          // default to clean if present and not explicitly toggled away, otherwise original
+          const viewMode = viewModes[item.id] || (hasClean ? "clean" : "original");
+          const displayImage = viewMode === "clean" && hasClean ? item.bg_removed_image_url : item.image_url;
+
+          return (
+            <div key={item.id} style={{ ...cardStyle, border: isSelected ? "2px solid #111" : "2px solid transparent" }} onClick={() => handleSelect(item.id)}>
+              <img src={displayImage} alt="wardrobe" style={imageStyle} />
+
+              {/* Checkbox Overlay */}
+              <div
+                style={{
+                  ...checkboxLabelStyle,
+                  background: isSelected ? "#111" : "#fff",
+                  borderColor: isSelected ? "#111" : "#ccc"
+                }}
+              >
+                {isSelected && <span style={{ color: "#fff", fontSize: "12px" }}>✓</span>}
+              </div>
+
+              {/* Toggle Button */}
+              {hasClean && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleViewMode(item.id);
+                  }}
+                  style={toggleBtnStyle}
+                  title="Toggle original/clean view"
+                >
+                  {viewMode === "clean" ? "🪄" : "🖼️"}
+                </button>
+              )}
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDelete(item.id, activeCategory);
+                }}
+                style={deleteBtnStyle}
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Action Buttons */}
+      <div style={actionsContainerStyle}>
+        {selectedItems.length > 0 && (
+          <button
+            onClick={handleRemoveBackground}
+            disabled={isProcessing}
+            style={magicButtonStyle}
+          >
+            {isProcessing ? "Processing..." : `Remove background (${selectedItems.length})`}
+          </button>
+        )}
+
+        {/* Floating Plus Button */}
+        <button onClick={openFileExplorer} style={plusButtonStyle}>
+          +
+        </button>
       </div>
 
       {/* Hidden File Input */}
@@ -262,11 +393,6 @@ export default function MyWardrobe() {
         onChange={handleUpload}
         style={{ display: "none" }}
       />
-
-      {/* Floating Plus Button */}
-      <button onClick={openFileExplorer} style={plusButtonStyle}>
-        +
-      </button>
     </div>
   );
 }
@@ -345,14 +471,65 @@ const deleteBtnStyle = {
 const imageStyle = {
   width: "100%",
   height: "220px",
-  objectFit: "cover",
+  objectFit: "contain",
   borderRadius: "10px",
 };
 
-const plusButtonStyle = {
+const checkboxLabelStyle = {
+  position: "absolute",
+  top: "16px",
+  left: "16px",
+  width: "20px",
+  height: "20px",
+  borderRadius: "4px",
+  border: "2px solid #ccc",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+};
+
+const toggleBtnStyle = {
+  position: "absolute",
+  bottom: "16px",
+  right: "16px",
+  background: "rgba(255, 255, 255, 0.9)",
+  border: "none",
+  borderRadius: "50%",
+  width: "36px",
+  height: "36px",
+  cursor: "pointer",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  fontSize: "18px",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
+};
+
+const actionsContainerStyle = {
   position: "fixed",
   bottom: "30px",
   right: "30px",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-end",
+  gap: "15px",
+};
+
+const magicButtonStyle = {
+  padding: "14px 24px",
+  borderRadius: "30px",
+  background: "linear-gradient(135deg, #FF6B6B, #556270)",
+  color: "#fff",
+  border: "none",
+  fontSize: "16px",
+  fontWeight: "bold",
+  cursor: "pointer",
+  boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
+  transition: "0.2s ease",
+};
+
+const plusButtonStyle = {
   width: "56px",
   height: "56px",
   borderRadius: "50%",
