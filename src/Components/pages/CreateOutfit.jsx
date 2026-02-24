@@ -14,6 +14,13 @@ export default function CreateOutfit() {
   const [place, setPlace] = useState("");
   const [date, setDate] = useState(null);
 
+  const [isLoading, setIsLoading] = useState(false);
+  const [weatherData, setWeatherData] = useState(null);
+  const [generatedOutfit, setGeneratedOutfit] = useState(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const token = localStorage.getItem("token");
+
   const allowedCountries = useMemo(() => {
     return Country.getAllCountries().filter(c => ALLOWED_COUNTRIES.includes(c.isoCode));
   }, []);
@@ -30,15 +37,59 @@ export default function CreateOutfit() {
     });
   }, [country]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
+    if (!occasion || !country || !place) {
+      setErrorMsg("Please fill in Occasion, Country, and State.");
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMsg("");
+    setWeatherData(null);
+    setGeneratedOutfit(null);
+
     const outfitData = {
       occasion,
       country,
-      place,
-      date: date ? date.format("YYYY-MM-DD") : null,
+      state: place, // backend expects "state"
+      target_date: date ? date.format("YYYY-MM-DD") : null,
     };
 
-    console.log("Generate outfit with:", outfitData);
+    try {
+      // 1. Fetch weather preview to display immediately
+      const weatherRes = await fetch("/api/outfit/preview-weather", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(outfitData)
+      });
+
+      if (!weatherRes.ok) throw new Error("Could not fetch weather data.");
+      const weather = await weatherRes.json();
+      setWeatherData(weather);
+
+      // 2. Instruct vertex to generate
+      const genRes = await fetch("/api/outfit/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(outfitData)
+      });
+
+      if (!genRes.ok) throw new Error("Outfit generation failed.");
+      const generated = await genRes.json();
+      setGeneratedOutfit(generated.generated_outfit);
+
+    } catch (err) {
+      console.error(err);
+      setErrorMsg(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -124,10 +175,54 @@ export default function CreateOutfit() {
           size="large"
           style={generateButtonStyle}
           onClick={handleGenerate}
+          loading={isLoading}
         >
-          Generate Outfit
+          {isLoading ? "Styling you..." : "Generate Outfit"}
         </Button>
+
+        {errorMsg && <p style={{ color: "red", marginTop: "15px", textAlign: "center" }}>{errorMsg}</p>}
       </div>
+
+      {/* Results Section */}
+      {(weatherData || generatedOutfit) && (
+        <div style={resultsCardStyle}>
+          {weatherData && (
+            <div style={weatherSectionStyle}>
+              <h3 style={{ fontSize: "18px", marginBottom: "8px" }}>🌤️ Weather Forecast</h3>
+              <p style={{ margin: 0, color: "#555" }}>
+                {weatherData.temperature_avg.toFixed(1)}°C | {weatherData.weather_condition}
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
+                H: {weatherData.temperature_max.toFixed(1)}°C  L: {weatherData.temperature_min.toFixed(1)}°C
+              </p>
+            </div>
+          )}
+
+          {isLoading && !generatedOutfit && (
+            <div style={{ textAlign: "center", padding: "40px" }}>
+              <div className="spinner" style={spinnerStyle}></div>
+              <p style={{ marginTop: "16px", color: "#666" }}>Designing your outfit with Vertex AI...</p>
+            </div>
+          )}
+
+          {generatedOutfit && (
+            <div style={outfitSectionStyle}>
+              <h3 style={{ fontSize: "22px", marginBottom: "16px" }}>✨ Your Generated Outfit</h3>
+              {generatedOutfit.image_url && (
+                <img
+                  src={generatedOutfit.image_url}
+                  alt="Generated Outfit"
+                  style={generatedImageStyle}
+                />
+              )}
+              <div style={{ marginTop: "20px", background: "#f9f9f9", padding: "16px", borderRadius: "8px" }}>
+                <p style={{ margin: "0 0 8px 0" }}><strong>Top:</strong> {generatedOutfit.top_description}</p>
+                <p style={{ margin: 0 }}><strong>Bottom:</strong> {generatedOutfit.bottom_description}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -180,3 +275,54 @@ const generateButtonStyle = {
   borderColor: "#111",
   marginTop: "10px",
 };
+
+const resultsCardStyle = {
+  background: "#ffffff",
+  padding: "40px",
+  borderRadius: "18px",
+  width: "660px",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+  marginLeft: "24px",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const weatherSectionStyle = {
+  padding: "16px",
+  background: "#f0f4f8",
+  borderRadius: "12px",
+  marginBottom: "24px",
+  borderLeft: "4px solid #6c5ce7",
+};
+
+const outfitSectionStyle = {
+  textAlign: "center",
+};
+
+const generatedImageStyle = {
+  width: "100%",
+  maxWidth: "400px",
+  borderRadius: "12px",
+  boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
+  objectFit: "cover",
+  aspectRatio: "1/1",
+};
+
+const spinnerStyle = {
+  width: "40px",
+  height: "40px",
+  border: "4px solid #f3f3f3",
+  borderTop: "4px solid #111",
+  borderRadius: "50%",
+  animation: "spin 1s linear infinite",
+  margin: "0 auto",
+};
+
+// Add keyframes inline for spinner hackiness or rely on CSS
+if (typeof document !== "undefined") {
+  const style = document.createElement("style");
+  style.innerHTML = `
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  `;
+  document.head.appendChild(style);
+}
