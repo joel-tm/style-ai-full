@@ -9,8 +9,9 @@ from models import User
 from schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
 from auth import hash_password, verify_password, create_access_token
 
-# Import wardrobe model so its table gets created
+# Import wardrobe and outfit models so their tables get created
 from wardrobe.models import WardrobeItem  # noqa: F401
+from outfit.models import OutfitRequest  # noqa: F401
 from wardrobe.routes import router as wardrobe_router
 
 # --- Create all tables ---
@@ -37,8 +38,9 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # --- Include routers ---
+from outfit.routes import router as outfit_router
 app.include_router(wardrobe_router)
-
+app.include_router(outfit_router)
 
 # --- Auth Routes ---
 
