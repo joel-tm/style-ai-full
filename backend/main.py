@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from database import engine, Base, get_db
 from models import User
@@ -59,11 +62,23 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if len(req.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
+    # Validate gender
+    valid_genders = ["male", "female", "prefer_not_to_say"]
+    if req.gender not in valid_genders:
+        raise HTTPException(status_code=400, detail=f"Gender must be one of: {', '.join(valid_genders)}")
+
+    # Validate date_of_birth
+    from datetime import date as _date
+    if req.date_of_birth >= _date.today():
+        raise HTTPException(status_code=400, detail="Date of birth must be in the past")
+
     # Create user
     user = User(
         name=req.name.strip(),
         email=req.email.strip().lower(),
         hashed_password=hash_password(req.password),
+        gender=req.gender,
+        date_of_birth=req.date_of_birth,
     )
     db.add(user)
     db.commit()
@@ -74,7 +89,7 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
     return TokenResponse(
         access_token=token,
-        user=UserResponse.model_validate(user),
+        user=UserResponse.from_user(user),
     )
 
 
@@ -94,7 +109,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
     return TokenResponse(
         access_token=token,
-        user=UserResponse.model_validate(user),
+        user=UserResponse.from_user(user),
     )
 
 

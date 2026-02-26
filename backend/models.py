@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Date
 from database import Base
 
 
@@ -9,3 +9,5 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
+    gender = Column(String, nullable=False, default="prefer_not_to_say")
+    date_of_birth = Column(Date, nullable=False)
