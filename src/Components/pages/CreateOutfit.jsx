@@ -18,6 +18,7 @@ export default function CreateOutfit() {
   const [weatherData, setWeatherData] = useState(null);
   const [generatedOutfit, setGeneratedOutfit] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
+  const [weatherLocation, setWeatherLocation] = useState("");
 
   const token = localStorage.getItem("token");
 
@@ -47,6 +48,7 @@ export default function CreateOutfit() {
     setErrorMsg("");
     setWeatherData(null);
     setGeneratedOutfit(null);
+    setWeatherLocation("");
 
     const outfitData = {
       occasion,
@@ -69,6 +71,9 @@ export default function CreateOutfit() {
       if (!weatherRes.ok) throw new Error("Could not fetch weather data.");
       const weather = await weatherRes.json();
       setWeatherData(weather);
+      // Build a human-readable location name from the selected country & state
+      const countryObj = allowedCountries.find(c => c.isoCode === country);
+      setWeatherLocation(`${place}, ${countryObj ? countryObj.name : country}`);
 
       // 2. Instruct vertex to generate
       const genRes = await fetch("/api/outfit/generate", {
@@ -188,7 +193,12 @@ export default function CreateOutfit() {
         <div style={resultsCardStyle}>
           {weatherData && (
             <div style={weatherSectionStyle}>
-              <h3 style={{ fontSize: "18px", marginBottom: "8px" }}>🌤️ Weather Forecast</h3>
+              <h3 style={{ fontSize: "18px", marginBottom: "4px" }}>🌤️ Weather Forecast</h3>
+              {weatherLocation && (
+                <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#444", fontWeight: 500 }}>
+                  📍 {weatherLocation}
+                </p>
+              )}
               <p style={{ margin: 0, color: "#555" }}>
                 {weatherData.temperature_avg.toFixed(1)}°C | {weatherData.weather_condition}
               </p>
@@ -207,10 +217,10 @@ export default function CreateOutfit() {
 
           {generatedOutfit && (
             <div style={outfitSectionStyle}>
-              <h3 style={{ fontSize: "22px", marginBottom: "16px" }}>✨ Your Generated Outfit</h3>
+              <h3 style={{ fontSize: "22px", marginBottom: "16px" }}>✨ Your Generated Outfit With AI </h3>
               {generatedOutfit.image_url && (
                 <img
-                  src={generatedOutfit.image_url}
+                  src={`http://localhost:8000${generatedOutfit.image_url}`}
                   alt="Generated Outfit"
                   style={generatedImageStyle}
                 />
