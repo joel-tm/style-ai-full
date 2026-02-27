@@ -6,7 +6,18 @@ import "antd/dist/reset.css";
 
 const { Option } = Select;
 
-const ALLOWED_COUNTRIES = ["AE", "SA", "TH", "US", "SG", "GB", "MY", "ID", "VN", "HK"];
+const ALLOWED_COUNTRIES = [
+  "AE",
+  "SA",
+  "TH",
+  "US",
+  "SG",
+  "GB",
+  "MY",
+  "ID",
+  "VN",
+  "HK",
+];
 
 export default function CreateOutfit() {
   const [occasion, setOccasion] = useState("");
@@ -20,9 +31,21 @@ export default function CreateOutfit() {
   const [errorMsg, setErrorMsg] = useState("");
   const [weatherLocation, setWeatherLocation] = useState("");
   const [history, setHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(true);
+  const [hiddenCards, setHiddenCards] = useState(new Set());
 
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
+
+  const toggleCardVisibility = (id, e) => {
+    e.stopPropagation();
+    setHiddenCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Fetch past outfits on mount
   useEffect(() => {
@@ -294,64 +317,102 @@ export default function CreateOutfit() {
       {/* end topRowStyle */}
 
       {/* Past Generated Outfits */}
-      {history.length > 0 && (
+      {history.filter((h) => h.generated_outfit).length > 0 && (
         <div style={historySectionStyle}>
-          <h2 style={{ fontSize: "24px", marginBottom: "20px", color: "#111" }}>
-            Past Generated Outfits
-          </h2>
-          <div style={historyGridStyle}>
-            {history
-              .filter((h) => h.generated_outfit)
-              .map((item) => (
-                <div
-                  key={item.id}
-                  style={historyCardStyle}
-                  onClick={() => navigate(`/outfit/${item.id}`)}
-                >
-                  {item.generated_outfit?.image_url && (
-                    <img
-                      src={`http://localhost:8000${item.generated_outfit.image_url}`}
-                      alt="Outfit"
-                      style={historyImageStyle}
-                    />
-                  )}
-                  <div style={{ padding: "12px" }}>
-                    <p
-                      style={{
-                        margin: "0 0 4px",
-                        fontWeight: 600,
-                        fontSize: "15px",
-                        color: "#111",
-                      }}
-                    >
-                      {item.occasion}
-                    </p>
-                    <p
-                      style={{
-                        margin: "0 0 4px",
-                        fontSize: "13px",
-                        color: "#555",
-                      }}
-                    >
-                      📍 {item.location.state}, {item.location.country}
-                    </p>
-                    <p
-                      style={{
-                        margin: "0 0 4px",
-                        fontSize: "13px",
-                        color: "#555",
-                      }}
-                    >
-                      📅 {item.target_date}
-                    </p>
-                    <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
-                      🌤️ {item.weather.weather_condition} ·{" "}
-                      {item.weather.temperature_avg.toFixed(1)}°C
-                    </p>
-                  </div>
-                </div>
-              ))}
+          <div style={historyHeaderStyle}>
+            <h2 style={{ fontSize: "24px", margin: 0, color: "#111" }}>
+              Past Generated Outfits
+            </h2>
+            <button
+              style={toggleBtnStyle}
+              onClick={() => setShowHistory((prev) => !prev)}
+            >
+              {showHistory ? "Hide All ▲" : "Show All ▼"}
+            </button>
           </div>
+
+          {showHistory && (
+            <div style={historyGridStyle}>
+              {history
+                .filter((h) => h.generated_outfit)
+                .map((item) => {
+                  const isHidden = hiddenCards.has(item.id);
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        ...historyCardStyle,
+                        opacity: isHidden ? 0.45 : 1,
+                      }}
+                      onClick={() =>
+                        !isHidden && navigate(`/outfit/${item.id}`)
+                      }
+                    >
+                      {/* Toggle visibility button */}
+                      <button
+                        style={cardToggleBtnStyle}
+                        onClick={(e) => toggleCardVisibility(item.id, e)}
+                        title={isHidden ? "Show card" : "Hide card"}
+                      >
+                        {isHidden ? "👁️" : "✕"}
+                      </button>
+
+                      {!isHidden && item.generated_outfit?.image_url && (
+                        <img
+                          src={`http://localhost:8000${item.generated_outfit.image_url}`}
+                          alt="Outfit"
+                          style={historyImageStyle}
+                        />
+                      )}
+                      <div style={{ padding: "12px" }}>
+                        <p
+                          style={{
+                            margin: "0 0 4px",
+                            fontWeight: 600,
+                            fontSize: "15px",
+                            color: isHidden ? "#aaa" : "#111",
+                          }}
+                        >
+                          {item.occasion}
+                        </p>
+                        {!isHidden && (
+                          <>
+                            <p
+                              style={{
+                                margin: "0 0 4px",
+                                fontSize: "13px",
+                                color: "#555",
+                              }}
+                            >
+                              📍 {item.location.state}, {item.location.country}
+                            </p>
+                            <p
+                              style={{
+                                margin: "0 0 4px",
+                                fontSize: "13px",
+                                color: "#555",
+                              }}
+                            >
+                              📅 {item.target_date}
+                            </p>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: "12px",
+                                color: "#888",
+                              }}
+                            >
+                              🌤️ {item.weather.weather_condition} ·{" "}
+                              {item.weather.temperature_avg.toFixed(1)}°C
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -466,13 +527,50 @@ const historyCardStyle = {
   overflow: "hidden",
   boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
   cursor: "pointer",
-  transition: "transform 0.2s, box-shadow 0.2s",
+  transition: "transform 0.2s, box-shadow 0.2s, opacity 0.3s",
+  position: "relative",
 };
 
 const historyImageStyle = {
   width: "100%",
   aspectRatio: "1/1",
   objectFit: "cover",
+};
+
+const historyHeaderStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+};
+
+const toggleBtnStyle = {
+  background: "#6c5ce7",
+  color: "#fff",
+  border: "none",
+  borderRadius: "8px",
+  padding: "8px 16px",
+  fontSize: "13px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const cardToggleBtnStyle = {
+  position: "absolute",
+  top: "8px",
+  right: "8px",
+  background: "rgba(0,0,0,0.5)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "50%",
+  width: "28px",
+  height: "28px",
+  fontSize: "14px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 2,
 };
 
 const spinnerStyle = {
