@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import date
+from typing import Optional
 
 
 class RegisterRequest(BaseModel):
@@ -20,14 +21,16 @@ class UserResponse(BaseModel):
     name: str
     email: str
     gender: str
-    date_of_birth: date
-    age: int  # computed field
+    date_of_birth: Optional[date] = None
+    age: Optional[int] = None  # computed field
 
     class Config:
         from_attributes = True
 
     @staticmethod
-    def _calc_age(dob: date) -> int:
+    def _calc_age(dob: Optional[date]) -> Optional[int]:
+        if not dob:
+            return None
         today = date.today()
         return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
 
@@ -37,7 +40,7 @@ class UserResponse(BaseModel):
             id=user.id,
             name=user.name,
             email=user.email,
-            gender=user.gender,
+            gender=user.gender or "prefer_not_to_say",
             date_of_birth=user.date_of_birth,
             age=cls._calc_age(user.date_of_birth),
         )

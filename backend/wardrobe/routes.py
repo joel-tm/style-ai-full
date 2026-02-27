@@ -9,7 +9,7 @@ from PIL import Image
 import rembg
 
 from database import get_db
-from auth import get_current_user_id
+from user.auth import get_current_user_id
 from wardrobe.models import WardrobeItem
 from wardrobe.schemas import WardrobeItemResponse, BatchProcessRequest
 

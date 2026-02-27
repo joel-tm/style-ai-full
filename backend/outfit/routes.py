@@ -4,8 +4,8 @@ from datetime import date
 from typing import List
 
 from database import get_db
-from auth import get_current_user_id
-from models import User
+from user.auth import get_current_user_id
+from user.models import User
 from outfit.models import OutfitRequest, GeneratedOutfit
 from outfit.schemas import OutfitGenerateRequest, OutfitRequestResponse, WeatherDataSchema
 from outfit.services import get_or_create_location, get_or_fetch_weather, generate_outfit_image
