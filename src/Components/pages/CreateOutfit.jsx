@@ -143,6 +143,11 @@ export default function CreateOutfit() {
 
   return (
     <div style={pageStyle}>
+      <div style={{ width: "100%", maxWidth: "1400px" }}>
+        <button style={backHomeBtnStyle} onClick={() => navigate("/home")}>
+          ← Back to Home
+        </button>
+      </div>
       <div style={topRowStyle}>
         <div style={cardStyle}>
           <h1 style={titleStyle}>Create a Great Outfit</h1>
@@ -445,6 +450,17 @@ const cardStyle = {
   borderRadius: "18px",
   width: "660px",
   boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+};
+
+const backHomeBtnStyle = {
+  background: "none",
+  border: "none",
+  color: "#6c5ce7",
+  cursor: "pointer",
+  fontSize: "14px",
+  fontWeight: 600,
+  padding: 0,
+  marginBottom: "12px",
 };
 
 const titleStyle = {
