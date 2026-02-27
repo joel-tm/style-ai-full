@@ -51,6 +51,17 @@ export default function MainPage() {
             </p>
           </div>
         </div>
+
+        {/* Suggest Outfit Section */}
+        <div
+          style={{ ...cardStyle, width: "960px", marginTop: "40px" }}
+          onClick={() => navigate("/suggest-outfit")}
+        >
+          <h2 style={cardTitle}>Suggest an Outfit from My Wardrobe</h2>
+          <p style={cardText}>
+            Get AI-powered outfit suggestions using clothes you already own
+          </p>
+        </div>
       </div>
     </div>
   );
