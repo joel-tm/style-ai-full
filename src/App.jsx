@@ -5,6 +5,7 @@ import MainPage from "./Components/pages/MainPage";
 import MyWardrobe from "./Components/pages/MyWardrobe";
 import CreateOutfit from "./Components/pages/CreateOutfit";
 import OutfitDetail from "./Components/pages/OutfitDetail";
+import SuggestOutfit from "./Components/pages/SuggestOutfit";
 import Register from "./Components/Register/Register";
 import Login from "./Components/login/Login";
 function App() {
@@ -19,6 +20,7 @@ function App() {
         <Route path="/wardrobe" element={<MyWardrobe />} />
         <Route path="/create-outfit" element={<CreateOutfit />} />
         <Route path="/outfit/:id" element={<OutfitDetail />} />
+        <Route path="/suggest-outfit" element={<SuggestOutfit />} />
       </Routes>
     </BrowserRouter>
   );
