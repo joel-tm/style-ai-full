@@ -105,3 +105,21 @@ def get_outfit_history(
     """
     requests = db.query(OutfitRequest).filter(OutfitRequest.user_id == user_id).order_by(OutfitRequest.created_at.desc()).all()
     return requests
+
+
+@router.get("/{outfit_id}", response_model=OutfitRequestResponse)
+def get_outfit_detail(
+    outfit_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Get details of a single outfit request by ID.
+    """
+    outfit_req = db.query(OutfitRequest).filter(
+        OutfitRequest.id == outfit_id,
+        OutfitRequest.user_id == user_id
+    ).first()
+    if not outfit_req:
+        raise HTTPException(status_code=404, detail="Outfit not found")
+    return outfit_req
