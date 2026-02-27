@@ -27,6 +27,8 @@ class WeatherDataSchema(BaseModel):
     temperature_max: float
     humidity: float
     weather_condition: str
+    using_defaults: bool = False
+    warning: Optional[str] = None
 
     class Config:
         from_attributes = True

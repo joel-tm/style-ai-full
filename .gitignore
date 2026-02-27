@@ -29,3 +29,5 @@ __pycache__/
 *.pyc
 *.db
 uploads/
+backend/project-cb62d79c-4b6f-488a-9f8-56907bcbbc82.json
+.env

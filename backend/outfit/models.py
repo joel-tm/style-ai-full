@@ -45,6 +45,7 @@ class OutfitRequest(Base):
     user = relationship("User")
     location = relationship("Location")
     weather = relationship("WeatherData")
+    generated_outfit = relationship("GeneratedOutfit", uselist=False, back_populates="request")
 
 
 class GeneratedOutfit(Base):
@@ -59,4 +60,4 @@ class GeneratedOutfit(Base):
     prompt_used = Column(String, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
-    request = relationship("OutfitRequest")
+    request = relationship("OutfitRequest", back_populates="generated_outfit")

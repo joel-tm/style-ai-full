@@ -5,6 +5,7 @@ from typing import List
 
 from database import get_db
 from auth import get_current_user_id
+from models import User
 from outfit.models import OutfitRequest, GeneratedOutfit
 from outfit.schemas import OutfitGenerateRequest, OutfitRequestResponse, WeatherDataSchema
 from outfit.services import get_or_create_location, get_or_fetch_weather, generate_outfit_image
@@ -24,7 +25,11 @@ async def preview_weather(
     try:
         location = await get_or_create_location(db, req.country, req.state)
         weather = await get_or_fetch_weather(db, location, target_date)
-        return weather
+        result = WeatherDataSchema.model_validate(weather)
+        if getattr(weather, '_using_defaults', False):
+            result.using_defaults = True
+            result.warning = "Using default weather as weather API is facing issues"
+        return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -58,10 +63,18 @@ async def generate_outfit(
         db.commit()
         db.refresh(outfit_req)
 
-        # 3. Generate Image
-        top_desc, bottom_desc, image_url, prompt = await generate_outfit_image(req.occasion, weather)
+        # 3. Fetch user profile for personalized generation
+        user = db.query(User).filter(User.id == user_id).first()
+        gender = user.gender if user and user.gender else "prefer_not_to_say"
+        age = None
+        if user and user.date_of_birth:
+            today = date.today()
+            age = today.year - user.date_of_birth.year - ((today.month, today.day) < (user.date_of_birth.month, user.date_of_birth.day))
 
-        # 4. Save Generated Outfit
+        # 4. Generate Image
+        top_desc, bottom_desc, image_url, prompt = await generate_outfit_image(req.occasion, weather, gender, age, req.country, req.state)
+
+        # 5. Save Generated Outfit
         gen_outfit = GeneratedOutfit(
             request_id=outfit_req.id,
             top_description=top_desc,
