@@ -1,7 +1,7 @@
-
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Input, Select, Button, DatePicker } from "antd";
 import { Country, State } from "country-state-city";
+import { useNavigate } from "react-router-dom";
 import "antd/dist/reset.css";
 
 const { Option } = Select;
@@ -19,11 +19,33 @@ export default function CreateOutfit() {
   const [generatedOutfit, setGeneratedOutfit] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [weatherLocation, setWeatherLocation] = useState("");
+  const [history, setHistory] = useState([]);
 
   const token = localStorage.getItem("token");
+  const navigate = useNavigate();
+
+  // Fetch past outfits on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch("/api/outfit/history", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setHistory(data);
+        }
+      } catch (err) {
+        console.error("Failed to load outfit history", err);
+      }
+    };
+    if (token) fetchHistory();
+  }, [token]);
 
   const allowedCountries = useMemo(() => {
-    return Country.getAllCountries().filter(c => ALLOWED_COUNTRIES.includes(c.isoCode));
+    return Country.getAllCountries().filter((c) =>
+      ALLOWED_COUNTRIES.includes(c.isoCode),
+    );
   }, []);
 
   const states = useMemo(() => {
@@ -63,16 +85,16 @@ export default function CreateOutfit() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(outfitData)
+        body: JSON.stringify(outfitData),
       });
 
       if (!weatherRes.ok) throw new Error("Could not fetch weather data.");
       const weather = await weatherRes.json();
       setWeatherData(weather);
       // Build a human-readable location name from the selected country & state
-      const countryObj = allowedCountries.find(c => c.isoCode === country);
+      const countryObj = allowedCountries.find((c) => c.isoCode === country);
       setWeatherLocation(`${place}, ${countryObj ? countryObj.name : country}`);
 
       // 2. Instruct vertex to generate
@@ -80,15 +102,14 @@ export default function CreateOutfit() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(outfitData)
+        body: JSON.stringify(outfitData),
       });
 
       if (!genRes.ok) throw new Error("Outfit generation failed.");
       const generated = await genRes.json();
       setGeneratedOutfit(generated.generated_outfit);
-
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message);
@@ -99,138 +120,238 @@ export default function CreateOutfit() {
 
   return (
     <div style={pageStyle}>
-      <div style={cardStyle}>
-        <h1 style={titleStyle}>Create a Great Outfit</h1>
-        <p style={subtitleStyle}>
-          Tell us a little more and we’ll style you perfectly
-        </p>
+      <div style={topRowStyle}>
+        <div style={cardStyle}>
+          <h1 style={titleStyle}>Create a Great Outfit</h1>
+          <p style={subtitleStyle}>
+            Tell us a little more and we’ll style you perfectly
+          </p>
 
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Occasion</label>
+            <Input
+              placeholder="Eg: Wedding, Office, Party"
+              value={occasion}
+              onChange={(e) => setOccasion(e.target.value)}
+            />
+          </div>
 
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Occasion</label>
-          <Input
-            placeholder="Eg: Wedding, Office, Party"
-            value={occasion}
-            onChange={(e) => setOccasion(e.target.value)}
-          />
-        </div>
+          {/* Country */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>Country</label>
+            <Select
+              placeholder="Select country"
+              value={country}
+              onChange={(value) => {
+                setCountry(value);
+                setPlace("");
+              }}
+              style={{ width: "100%" }}
+              showSearch
+              optionFilterProp="children"
+              getPopupContainer={(node) => node.parentNode}
+            >
+              {allowedCountries.map((c) => (
+                <Option key={c.isoCode} value={c.isoCode}>
+                  {c.name}
+                </Option>
+              ))}
+            </Select>
+          </div>
 
-        {/* Country */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Country</label>
-          <Select
-            placeholder="Select country"
-            value={country}
-            onChange={(value) => {
-              setCountry(value);
-              setPlace("");
-            }}
-            style={{ width: "100%" }}
-            showSearch
-            optionFilterProp="children"
-            getPopupContainer={(node) => node.parentNode}
+          {/* State/Region */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>State / Region</label>
+            <Select
+              placeholder="Select state"
+              value={place}
+              onChange={(value) => setPlace(value)}
+              style={{ width: "100%" }}
+              disabled={!country}
+              showSearch
+              optionFilterProp="children"
+              getPopupContainer={(node) => node.parentNode}
+            >
+              {states.map((state) => (
+                <Option
+                  key={`${state.name}-${state.isoCode}`}
+                  value={state.name}
+                >
+                  {state.name}
+                </Option>
+              ))}
+            </Select>
+          </div>
+
+          {/* Optional Date */}
+          <div style={fieldStyle}>
+            <label style={labelStyle}>
+              Date{" "}
+              <span style={{ color: "#888", fontWeight: "normal" }}>
+                (Optional)
+              </span>
+            </label>
+            <DatePicker
+              style={{ width: "100%" }}
+              value={date}
+              onChange={(val) => setDate(val)}
+              placeholder="Select a date"
+              getPopupContainer={(node) => node.parentNode}
+            />
+          </div>
+
+          <Button
+            type="primary"
+            block
+            size="large"
+            style={generateButtonStyle}
+            onClick={handleGenerate}
+            loading={isLoading}
           >
-            {allowedCountries.map((c) => (
-              <Option key={c.isoCode} value={c.isoCode}>
-                {c.name}
-              </Option>
-            ))}
-          </Select>
+            {isLoading ? "Styling you..." : "Generate Outfit"}
+          </Button>
+
+          {errorMsg && (
+            <p style={{ color: "red", marginTop: "15px", textAlign: "center" }}>
+              {errorMsg}
+            </p>
+          )}
         </div>
 
-        {/* State/Region */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>State / Region</label>
-          <Select
-            placeholder="Select state"
-            value={place}
-            onChange={(value) => setPlace(value)}
-            style={{ width: "100%" }}
-            disabled={!country}
-            showSearch
-            optionFilterProp="children"
-            getPopupContainer={(node) => node.parentNode}
-          >
-            {states.map((state) => (
-              <Option
-                key={`${state.name}-${state.isoCode}`}
-                value={state.name}
-              >
-                {state.name}
-              </Option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Optional Date */}
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Date <span style={{ color: "#888", fontWeight: "normal" }}>(Optional)</span></label>
-          <DatePicker
-            style={{ width: "100%" }}
-            value={date}
-            onChange={(val) => setDate(val)}
-            placeholder="Select a date"
-            getPopupContainer={(node) => node.parentNode}
-          />
-        </div>
-
-        <Button
-          type="primary"
-          block
-          size="large"
-          style={generateButtonStyle}
-          onClick={handleGenerate}
-          loading={isLoading}
-        >
-          {isLoading ? "Styling you..." : "Generate Outfit"}
-        </Button>
-
-        {errorMsg && <p style={{ color: "red", marginTop: "15px", textAlign: "center" }}>{errorMsg}</p>}
-      </div>
-
-      {/* Results Section */}
-      {(weatherData || generatedOutfit) && (
-        <div style={resultsCardStyle}>
-          {weatherData && (
-            <div style={weatherSectionStyle}>
-              <h3 style={{ fontSize: "18px", marginBottom: "4px" }}>🌤️ Weather Forecast</h3>
-              {weatherLocation && (
-                <p style={{ margin: "0 0 6px 0", fontSize: "13px", color: "#444", fontWeight: 500 }}>
-                  📍 {weatherLocation}
+        {/* Results Section */}
+        {(weatherData || generatedOutfit) && (
+          <div style={resultsCardStyle}>
+            {weatherData && (
+              <div style={weatherSectionStyle}>
+                <h3 style={{ fontSize: "18px", marginBottom: "4px" }}>
+                  🌤️ Weather Forecast
+                </h3>
+                {weatherLocation && (
+                  <p
+                    style={{
+                      margin: "0 0 6px 0",
+                      fontSize: "13px",
+                      color: "#444",
+                      fontWeight: 500,
+                    }}
+                  >
+                    📍 {weatherLocation}
+                  </p>
+                )}
+                <p style={{ margin: 0, color: "#555" }}>
+                  {weatherData.temperature_avg.toFixed(1)}°C |{" "}
+                  {weatherData.weather_condition}
                 </p>
-              )}
-              <p style={{ margin: 0, color: "#555" }}>
-                {weatherData.temperature_avg.toFixed(1)}°C | {weatherData.weather_condition}
-              </p>
-              <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
-                H: {weatherData.temperature_max.toFixed(1)}°C  L: {weatherData.temperature_min.toFixed(1)}°C
-              </p>
-            </div>
-          )}
-
-          {isLoading && !generatedOutfit && (
-            <div style={{ textAlign: "center", padding: "40px" }}>
-              <div className="spinner" style={spinnerStyle}></div>
-              <p style={{ marginTop: "16px", color: "#666" }}>Designing your outfit with Vertex AI...</p>
-            </div>
-          )}
-
-          {generatedOutfit && (
-            <div style={outfitSectionStyle}>
-              <h3 style={{ fontSize: "22px", marginBottom: "16px" }}>✨ Your Generated Outfit With AI </h3>
-              {generatedOutfit.image_url && (
-                <img
-                  src={`http://localhost:8000${generatedOutfit.image_url}`}
-                  alt="Generated Outfit"
-                  style={generatedImageStyle}
-                />
-              )}
-              <div style={{ marginTop: "20px", background: "#f9f9f9", padding: "16px", borderRadius: "8px" }}>
-                <p style={{ margin: "0 0 8px 0" }}><strong>Top:</strong> {generatedOutfit.top_description}</p>
-                <p style={{ margin: 0 }}><strong>Bottom:</strong> {generatedOutfit.bottom_description}</p>
+                <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
+                  H: {weatherData.temperature_max.toFixed(1)}°C L:{" "}
+                  {weatherData.temperature_min.toFixed(1)}°C
+                </p>
               </div>
-            </div>
-          )}
+            )}
+
+            {isLoading && !generatedOutfit && (
+              <div style={{ textAlign: "center", padding: "40px" }}>
+                <div className="spinner" style={spinnerStyle}></div>
+                <p style={{ marginTop: "16px", color: "#666" }}>
+                  Designing your outfit with Vertex AI...
+                </p>
+              </div>
+            )}
+
+            {generatedOutfit && (
+              <div style={outfitSectionStyle}>
+                <h3 style={{ fontSize: "22px", marginBottom: "16px" }}>
+                  ✨ Your Generated Outfit With AI{" "}
+                </h3>
+                {generatedOutfit.image_url && (
+                  <img
+                    src={`http://localhost:8000${generatedOutfit.image_url}`}
+                    alt="Generated Outfit"
+                    style={generatedImageStyle}
+                  />
+                )}
+                <div
+                  style={{
+                    marginTop: "20px",
+                    background: "#f9f9f9",
+                    padding: "16px",
+                    borderRadius: "8px",
+                  }}
+                >
+                  <p style={{ margin: "0 0 8px 0" }}>
+                    <strong>Top:</strong> {generatedOutfit.top_description}
+                  </p>
+                  <p style={{ margin: 0 }}>
+                    <strong>Bottom:</strong>{" "}
+                    {generatedOutfit.bottom_description}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {/* end topRowStyle */}
+
+      {/* Past Generated Outfits */}
+      {history.length > 0 && (
+        <div style={historySectionStyle}>
+          <h2 style={{ fontSize: "24px", marginBottom: "20px", color: "#111" }}>
+            Past Generated Outfits
+          </h2>
+          <div style={historyGridStyle}>
+            {history
+              .filter((h) => h.generated_outfit)
+              .map((item) => (
+                <div
+                  key={item.id}
+                  style={historyCardStyle}
+                  onClick={() => navigate(`/outfit/${item.id}`)}
+                >
+                  {item.generated_outfit?.image_url && (
+                    <img
+                      src={`http://localhost:8000${item.generated_outfit.image_url}`}
+                      alt="Outfit"
+                      style={historyImageStyle}
+                    />
+                  )}
+                  <div style={{ padding: "12px" }}>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        fontWeight: 600,
+                        fontSize: "15px",
+                        color: "#111",
+                      }}
+                    >
+                      {item.occasion}
+                    </p>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        fontSize: "13px",
+                        color: "#555",
+                      }}
+                    >
+                      📍 {item.location.state}, {item.location.country}
+                    </p>
+                    <p
+                      style={{
+                        margin: "0 0 4px",
+                        fontSize: "13px",
+                        color: "#555",
+                      }}
+                    >
+                      📅 {item.target_date}
+                    </p>
+                    <p style={{ margin: 0, fontSize: "12px", color: "#888" }}>
+                      🌤️ {item.weather.weather_condition} ·{" "}
+                      {item.weather.temperature_avg.toFixed(1)}°C
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>
@@ -243,9 +364,18 @@ const pageStyle = {
   minHeight: "100vh",
   background: "#eeeeee",
   display: "flex",
-  justifyContent: "center",
+  flexDirection: "column",
   alignItems: "center",
   fontFamily: "Arial, sans-serif",
+  padding: "40px 20px",
+};
+
+const topRowStyle = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "flex-start",
+  width: "100%",
+  maxWidth: "1400px",
 };
 
 const cardStyle = {
@@ -316,6 +446,33 @@ const generatedImageStyle = {
   boxShadow: "0 4px 15px rgba(0,0,0,0.1)",
   objectFit: "cover",
   aspectRatio: "1/1",
+};
+
+const historySectionStyle = {
+  width: "100%",
+  maxWidth: "1400px",
+  marginTop: "40px",
+};
+
+const historyGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+  gap: "20px",
+};
+
+const historyCardStyle = {
+  background: "#fff",
+  borderRadius: "14px",
+  overflow: "hidden",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+  cursor: "pointer",
+  transition: "transform 0.2s, box-shadow 0.2s",
+};
+
+const historyImageStyle = {
+  width: "100%",
+  aspectRatio: "1/1",
+  objectFit: "cover",
 };
 
 const spinnerStyle = {
