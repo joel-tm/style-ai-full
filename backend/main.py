@@ -9,7 +9,7 @@ load_dotenv()
 
 from database import engine, Base, get_db
 from user.models import User
-from schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
+from user.schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
 from user.auth import hash_password, verify_password, create_access_token
 
 # Import wardrobe and outfit models so their tables get created
