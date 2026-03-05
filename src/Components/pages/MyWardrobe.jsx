@@ -363,15 +363,11 @@ export default function MyWardrobe() {
           return next;
         });
 
-        alert(
-          `✓ AI analysis complete for ${updatedItems.length} item(s)!`,
-        );
+        alert(`✓ AI analysis complete for ${updatedItems.length} item(s)!`);
         setSelectedItems([]);
       } else {
         const err = await res.json().catch(() => ({}));
-        alert(
-          "AI analysis failed: " + (err.detail || "Unknown error"),
-        );
+        alert("AI analysis failed: " + (err.detail || "Unknown error"));
       }
     } catch (err) {
       console.error("AI analysis error:", err);
@@ -382,17 +378,11 @@ export default function MyWardrobe() {
   };
 
   const handleManualAnalysis = async () => {
-    if (
-      !manualValues.type ||
-      !manualValues.primaryColor ||
-      !manualValues.fit ||
-      !manualValues.fabricType
-    ) {
-      alert(
-        "Please fill in at least Type, Primary Color, Fit, and Fabric Type",
-      );
-      return;
-    }
+    // Default empty fields to "N/A"
+    const dataWithDefaults = Object.keys(manualValues).reduce((acc, key) => {
+      acc[key] = manualValues[key] === "" ? "N/A" : manualValues[key];
+      return acc;
+    }, {});
 
     setIsProcessing(true);
 
@@ -405,7 +395,7 @@ export default function MyWardrobe() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(manualValues),
+          body: JSON.stringify(dataWithDefaults),
         }),
       );
 
@@ -523,24 +513,32 @@ export default function MyWardrobe() {
               </div>
 
               {/* Toggle Button */}
-              {hasClean && (
+              {(hasClean ||
+                (item.image_analysis &&
+                  typeof item.image_analysis === "object" &&
+                  Object.keys(item.image_analysis).length > 0)) && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleViewMode(item.id);
+                    if (hasClean) toggleViewMode(item.id);
                   }}
                   style={{
                     ...toggleBtnStyle,
                     background:
                       item.image_analysis &&
-                        typeof item.image_analysis === "object" &&
-                        Object.keys(item.image_analysis).length > 0
+                      typeof item.image_analysis === "object" &&
+                      Object.keys(item.image_analysis).length > 0
                         ? "rgba(206, 200, 243, 0.9)"
                         : "rgba(247, 247, 247, 0.95)",
+                    cursor: hasClean ? "pointer" : "default",
                   }}
-                  title="Toggle original/clean view"
+                  title={
+                    hasClean
+                      ? "Toggle original/clean view"
+                      : "Image analysis complete"
+                  }
                 >
-                  {viewMode === "clean" ? "🪄" : "🖼️"}
+                  {hasClean ? (viewMode === "clean" ? "🪄" : "🖼️") : "✅"}
                 </button>
               )}
 

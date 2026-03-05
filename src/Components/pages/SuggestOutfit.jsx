@@ -17,6 +17,7 @@ const ALLOWED_COUNTRIES = [
   "ID",
   "VN",
   "HK",
+  "IN",
 ];
 
 export default function SuggestOutfit() {
