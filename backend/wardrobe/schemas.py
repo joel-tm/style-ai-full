@@ -4,7 +4,8 @@ from typing import Optional, List, Dict, Any
 
 class ImageAnalysisData(BaseModel):
     type: Optional[str] = None
-    subtype: Optional[str] = None
+    neckline: Optional[str] = None
+    sleevelength: Optional[str] = None
     primaryColor: Optional[str] = None
     secondaryColors: Optional[str] = None
     fit: Optional[str] = None
