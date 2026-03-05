@@ -129,6 +129,22 @@ export default function MyWardrobe() {
   const [selectedItems, setSelectedItems] = useState([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [viewModes, setViewModes] = useState({}); // { id: 'clean' | 'original' }
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [manualValues, setManualValues] = useState({
+    // Category
+    type: "",
+    neckline: "",
+    sleevelength: "",
+    // Color Information
+    primaryColor: "",
+    secondaryColors: "",
+    // Fit & Silhouette
+    fit: "",
+    length: "",
+    // Material & Texture
+    fabricType: "",
+    texture: "",
+  });
 
   const token = localStorage.getItem("token");
 
@@ -225,7 +241,7 @@ export default function MyWardrobe() {
     setSelectedItems((prev) =>
       prev.includes(itemId)
         ? prev.filter((id) => id !== itemId)
-        : [...prev, itemId]
+        : [...prev, itemId],
     );
   };
 
@@ -250,10 +266,12 @@ export default function MyWardrobe() {
         setWardrobe((prev) => {
           const next = { ...prev };
           const itemsMap = {};
-          updatedItems.forEach((u) => { itemsMap[u.id] = u; });
+          updatedItems.forEach((u) => {
+            itemsMap[u.id] = u;
+          });
 
           next[activeCategory] = next[activeCategory].map((item) =>
-            itemsMap[item.id] ? itemsMap[item.id] : item
+            itemsMap[item.id] ? itemsMap[item.id] : item,
           );
           return next;
         });
@@ -261,7 +279,7 @@ export default function MyWardrobe() {
         // Auto view the clean versions
         setViewModes((prev) => {
           const next = { ...prev };
-          updatedItems.forEach(item => {
+          updatedItems.forEach((item) => {
             if (item.bg_removed_image_url) {
               next[item.id] = "clean";
             }
@@ -283,8 +301,119 @@ export default function MyWardrobe() {
   const toggleViewMode = (itemId) => {
     setViewModes((prev) => ({
       ...prev,
-      [itemId]: prev[itemId] === "original" ? "clean" : "original"
+      [itemId]: prev[itemId] === "original" ? "clean" : "original",
     }));
+  };
+
+  const handleSelectAll = () => {
+    const categoryItems = wardrobe[activeCategory];
+    if (selectedItems.length === categoryItems.length) {
+      // If all already selected, deselect all
+      setSelectedItems([]);
+    } else {
+      // Select all in current category
+      setSelectedItems(categoryItems.map((item) => item.id));
+    }
+  };
+
+  const handleImageAnalysisClick = () => {
+    if (selectedItems.length === 0) return;
+    setShowAnalysisModal(true);
+    setManualValues({
+      type: "",
+      neckline: "",
+      sleevelength: "",
+      primaryColor: "",
+      secondaryColors: "",
+      fit: "",
+      length: "",
+      fabricType: "",
+      texture: "",
+    });
+  };
+
+  const handleAIAnalysis = async () => {
+    setShowAnalysisModal(false);
+    await handleRemoveBackground();
+  };
+
+  const handleManualAnalysis = async () => {
+    if (
+      !manualValues.type ||
+      !manualValues.primaryColor ||
+      !manualValues.fit ||
+      !manualValues.fabricType
+    ) {
+      alert(
+        "Please fill in at least Type, Primary Color, Fit, and Fabric Type",
+      );
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      // Send manual analysis data for each selected item
+      const promises = selectedItems.map((itemId) =>
+        fetch(`/api/wardrobe/${itemId}/image-analysis`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(manualValues),
+        }),
+      );
+
+      const responses = await Promise.all(promises);
+      const allSuccess = responses.every((res) => res.ok);
+
+      if (allSuccess) {
+        // Refresh wardrobe data to get updated items with image_analysis
+        const refreshRes = await fetch("/api/wardrobe", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (refreshRes.ok) {
+          const items = await refreshRes.json();
+          const grouped = {
+            Tops: [],
+            Bottoms: [],
+            Dresses: [],
+            Footwear: [],
+            Accessories: [],
+          };
+          items.forEach((item) => {
+            if (grouped[item.category]) {
+              grouped[item.category].push(item);
+            }
+          });
+          setWardrobe(grouped);
+        }
+
+        alert(`✓ Image analysis saved for ${selectedItems.length} item(s)!`);
+        setShowAnalysisModal(false);
+        setSelectedItems([]);
+        setManualValues({
+          type: "",
+          neckline: "",
+          sleevelength: "",
+          primaryColor: "",
+          secondaryColors: "",
+          fit: "",
+          length: "",
+          fabricType: "",
+          texture: "",
+        });
+      } else {
+        alert("Failed to save image analysis. Please try again.");
+      }
+    } catch (err) {
+      console.error("Manual analysis error:", err);
+      alert("Error saving image analysis: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -303,10 +432,8 @@ export default function MyWardrobe() {
             onClick={() => setActiveCategory(cat)}
             style={{
               ...categoryButtonStyle,
-              backgroundColor:
-                activeCategory === cat ? "#111" : "#e5e5e5",
-              color:
-                activeCategory === cat ? "#fff" : "#111",
+              backgroundColor: activeCategory === cat ? "#111" : "#e5e5e5",
+              color: activeCategory === cat ? "#fff" : "#111",
             }}
           >
             {cat}
@@ -320,11 +447,22 @@ export default function MyWardrobe() {
           const isSelected = selectedItems.includes(item.id);
           const hasClean = !!item.bg_removed_image_url;
           // default to clean if present and not explicitly toggled away, otherwise original
-          const viewMode = viewModes[item.id] || (hasClean ? "clean" : "original");
-          const displayImage = viewMode === "clean" && hasClean ? item.bg_removed_image_url : item.image_url;
+          const viewMode =
+            viewModes[item.id] || (hasClean ? "clean" : "original");
+          const displayImage =
+            viewMode === "clean" && hasClean
+              ? item.bg_removed_image_url
+              : item.image_url;
 
           return (
-            <div key={item.id} style={{ ...cardStyle, border: isSelected ? "2px solid #111" : "2px solid transparent" }} onClick={() => handleSelect(item.id)}>
+            <div
+              key={item.id}
+              style={{
+                ...cardStyle,
+                border: isSelected ? "2px solid #111" : "2px solid transparent",
+              }}
+              onClick={() => handleSelect(item.id)}
+            >
               <img src={displayImage} alt="wardrobe" style={imageStyle} />
 
               {/* Checkbox Overlay */}
@@ -332,10 +470,12 @@ export default function MyWardrobe() {
                 style={{
                   ...checkboxLabelStyle,
                   background: isSelected ? "#111" : "#fff",
-                  borderColor: isSelected ? "#111" : "#ccc"
+                  borderColor: isSelected ? "#111" : "#ccc",
                 }}
               >
-                {isSelected && <span style={{ color: "#fff", fontSize: "12px" }}>✓</span>}
+                {isSelected && (
+                  <span style={{ color: "#fff", fontSize: "12px" }}>✓</span>
+                )}
               </div>
 
               {/* Toggle Button */}
@@ -345,7 +485,12 @@ export default function MyWardrobe() {
                     e.stopPropagation();
                     toggleViewMode(item.id);
                   }}
-                  style={toggleBtnStyle}
+                  style={{
+                    ...toggleBtnStyle,
+                    background: item.image_analysis
+                      ? "rgba(240, 240, 240, 0.95)"
+                      : "rgba(193, 190, 212, 0.9)",
+                  }}
                   title="Toggle original/clean view"
                 >
                   {viewMode === "clean" ? "🪄" : "🖼️"}
@@ -374,9 +519,48 @@ export default function MyWardrobe() {
             disabled={isProcessing}
             style={magicButtonStyle}
           >
-            {isProcessing ? "Processing..." : `Remove background (${selectedItems.length})`}
+            {isProcessing
+              ? "Processing..."
+              : `Remove background (${selectedItems.length})`}
           </button>
         )}
+
+        {/* Floating Image Analysis Icon Button */}
+        <button
+          onClick={handleImageAnalysisClick}
+          disabled={selectedItems.length === 0 || isProcessing}
+          style={{
+            ...floatingRemoveBgButtonStyle,
+            opacity: selectedItems.length === 0 ? 0.5 : 1,
+            cursor: selectedItems.length === 0 ? "not-allowed" : "pointer",
+          }}
+          title="Image analysis on selected items"
+        >
+          <span style={{ fontSize: "20px", marginRight: "6px" }}></span>
+          <span style={{ fontSize: "12px", fontWeight: "600" }}>
+            Image Analysis
+          </span>
+        </button>
+
+        {/* Floating Select All Icon Button */}
+        <button
+          onClick={handleSelectAll}
+          style={{
+            ...floatingSelectAllButtonStyle,
+          }}
+          title={
+            selectedItems.length === wardrobe[activeCategory].length
+              ? "Deselect all"
+              : "Select all items"
+          }
+        >
+          <span style={{ fontSize: "20px", marginRight: "6px" }}>☑️</span>
+          <span style={{ fontSize: "12px", fontWeight: "600" }}>
+            {selectedItems.length === wardrobe[activeCategory].length
+              ? "Deselect All"
+              : "Select All"}
+          </span>
+        </button>
 
         {/* Floating Plus Button */}
         <button onClick={openFileExplorer} style={plusButtonStyle}>
@@ -393,6 +577,206 @@ export default function MyWardrobe() {
         onChange={handleUpload}
         style={{ display: "none" }}
       />
+
+      {/* Image Analysis Modal */}
+      {showAnalysisModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalBoxStyle}>
+            <h2 style={modalTitleStyle}>Choose Analysis Method</h2>
+            <p style={modalDescriptionStyle}>
+              Select how you want to analyze the selected {selectedItems.length}{" "}
+              item(s)
+            </p>
+
+            {/* AI Option */}
+            <div style={optionRowStyle}>
+              <button
+                onClick={handleAIAnalysis}
+                disabled={isProcessing}
+                style={aiOptionStyle}
+              >
+                <span style={{ fontSize: "28px", marginBottom: "8px" }}>
+                  🤖
+                </span>
+                <span style={{ fontWeight: "600" }}>Use AI Analysis</span>
+                <span
+                  style={{ fontSize: "12px", marginTop: "4px", opacity: 0.7 }}
+                >
+                  Auto-detect category, color, fit, material
+                </span>
+              </button>
+            </div>
+
+            {/* Manual Option */}
+            <div style={optionRowStyle}>
+              <div style={manualOptionContainerStyle}>
+                <h3 style={manualTitleStyle}>📝 Manual Entry</h3>
+
+                {/* Category Section */}
+                <div style={sectionHeaderStyle}>Category</div>
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Type</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Shirt, Trousers, Blazer, Dress, Sneakers"
+                    value={manualValues.type}
+                    onChange={(e) =>
+                      setManualValues({ ...manualValues, type: e.target.value })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Neckline</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Crew Neck, V-Neck, Polo, Turtleneck"
+                    value={manualValues.neckline}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        neckline: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Sleeve Length</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Short, 3/4, Long, Sleeveless"
+                    value={manualValues.sleevelength}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        sleevelength: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Color Information Section */}
+                <div style={sectionHeaderStyle}>Color Information</div>
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Primary Color</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Red, Blue, Black"
+                    value={manualValues.primaryColor}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        primaryColor: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Secondary Colors</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., White, Grey (comma-separated)"
+                    value={manualValues.secondaryColors}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        secondaryColors: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Fit & Silhouette Section */}
+                <div style={sectionHeaderStyle}>Fit & Silhouette</div>
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Fit</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Slim, Regular, Oversized"
+                    value={manualValues.fit}
+                    onChange={(e) =>
+                      setManualValues({ ...manualValues, fit: e.target.value })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Length</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Cropped, Knee-length, Full-length, regular "
+                    value={manualValues.length}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        length: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                {/* Material & Texture Section */}
+                <div style={sectionHeaderStyle}>Material & Texture</div>
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Fabric Type</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Cotton, Wool, Denim, Silk, Polyester"
+                    value={manualValues.fabricType}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        fabricType: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <div style={inputGroupStyle}>
+                  <label style={labelStyle}>Texture</label>
+                  <input
+                    type="text"
+                    placeholder="e.g., Smooth, Ribbed, Chunky, Flowy"
+                    value={manualValues.texture}
+                    onChange={(e) =>
+                      setManualValues({
+                        ...manualValues,
+                        texture: e.target.value,
+                      })
+                    }
+                    style={inputStyle}
+                  />
+                </div>
+
+                <button
+                  onClick={handleManualAnalysis}
+                  style={submitManualButtonStyle}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+
+            {/* Cancel Button */}
+            <button
+              onClick={() => setShowAnalysisModal(false)}
+              style={cancelButtonStyle}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -517,16 +901,21 @@ const actionsContainerStyle = {
 };
 
 const magicButtonStyle = {
-  padding: "14px 24px",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  padding: "10px 16px",
   borderRadius: "30px",
   background: "linear-gradient(135deg, #FF6B6B, #556270)",
   color: "#fff",
   border: "none",
-  fontSize: "16px",
-  fontWeight: "bold",
+  fontSize: "14px",
+  fontWeight: "600",
   cursor: "pointer",
-  boxShadow: "0 6px 15px rgba(0,0,0,0.2)",
-  transition: "0.2s ease",
+  boxShadow: "0 8px 20px rgba(255, 107, 107, 0.4)",
+  transition: "all 0.3s ease",
+  whiteSpace: "nowrap",
 };
 
 const plusButtonStyle = {
@@ -539,4 +928,173 @@ const plusButtonStyle = {
   border: "none",
   cursor: "pointer",
   boxShadow: "0 10px 25px rgba(0,0,0,0.25)",
+};
+const floatingRemoveBgButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  padding: "10px 16px",
+  borderRadius: "30px",
+  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  color: "#fff",
+  border: "none",
+  fontSize: "14px",
+  fontWeight: "600",
+  cursor: "pointer",
+  boxShadow: "0 8px 20px rgba(102, 126, 234, 0.4)",
+  transition: "all 0.3s ease",
+  whiteSpace: "nowrap",
+};
+
+const floatingSelectAllButtonStyle = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "6px",
+  padding: "10px 16px",
+  borderRadius: "30px",
+  background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+  color: "#fff",
+  border: "none",
+  fontSize: "14px",
+  fontWeight: "600",
+  cursor: "pointer",
+  boxShadow: "0 8px 20px rgba(245, 87, 108, 0.4)",
+  transition: "all 0.3s ease",
+  whiteSpace: "nowrap",
+};
+
+/* Modal Styles */
+const modalOverlayStyle = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  background: "rgba(0, 0, 0, 0.5)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1000,
+};
+
+const modalBoxStyle = {
+  background: "#fff",
+  borderRadius: "16px",
+  padding: "32px",
+  maxWidth: "600px",
+  width: "90%",
+  maxHeight: "90vh",
+  overflowY: "auto",
+  boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+};
+
+const modalTitleStyle = {
+  fontSize: "24px",
+  fontWeight: "700",
+  color: "#111",
+  marginBottom: "8px",
+};
+
+const modalDescriptionStyle = {
+  fontSize: "14px",
+  color: "#666",
+  marginBottom: "24px",
+};
+
+const optionRowStyle = {
+  marginBottom: "20px",
+};
+
+const aiOptionStyle = {
+  width: "100%",
+  padding: "24px",
+  borderRadius: "12px",
+  background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  color: "#fff",
+  border: "none",
+  fontSize: "16px",
+  fontWeight: "600",
+  cursor: "pointer",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "8px",
+  transition: "transform 0.2s ease, opacity 0.2s ease",
+};
+
+const manualOptionContainerStyle = {
+  background: "#f7f7f7",
+  borderRadius: "12px",
+  padding: "20px",
+  border: "2px solid #e5e5e5",
+};
+
+const manualTitleStyle = {
+  fontSize: "16px",
+  fontWeight: "600",
+  color: "#111",
+  marginBottom: "16px",
+};
+
+const sectionHeaderStyle = {
+  fontSize: "13px",
+  fontWeight: "700",
+  color: "#111",
+  marginTop: "16px",
+  marginBottom: "12px",
+  textTransform: "uppercase",
+  letterSpacing: "0.5px",
+};
+
+const inputGroupStyle = {
+  marginBottom: "16px",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const labelStyle = {
+  fontSize: "14px",
+  fontWeight: "600",
+  color: "#666",
+  marginBottom: "6px",
+};
+
+const inputStyle = {
+  padding: "10px 12px",
+  borderRadius: "8px",
+  border: "1px solid #ddd",
+  fontSize: "14px",
+  fontFamily: "Arial, sans-serif",
+  transition: "border-color 0.2s ease",
+};
+
+const submitManualButtonStyle = {
+  width: "100%",
+  padding: "12px",
+  borderRadius: "8px",
+  background: "#111",
+  color: "#fff",
+  border: "none",
+  fontSize: "14px",
+  fontWeight: "600",
+  cursor: "pointer",
+  marginTop: "12px",
+  transition: "background 0.2s ease",
+};
+
+const cancelButtonStyle = {
+  width: "100%",
+  padding: "12px",
+  borderRadius: "8px",
+  background: "#e5e5e5",
+  color: "#111",
+  border: "none",
+  fontSize: "14px",
+  fontWeight: "600",
+  cursor: "pointer",
+  marginTop: "16px",
+  transition: "background 0.2s ease",
 };
