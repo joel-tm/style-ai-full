@@ -334,7 +334,51 @@ export default function MyWardrobe() {
 
   const handleAIAnalysis = async () => {
     setShowAnalysisModal(false);
-    await handleRemoveBackground();
+    setIsProcessing(true);
+
+    try {
+      const res = await fetch("/api/wardrobe/ai-analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ item_ids: selectedItems }),
+      });
+
+      if (res.ok) {
+        const updatedItems = await res.json();
+
+        // Update local state with AI-analyzed items
+        setWardrobe((prev) => {
+          const next = { ...prev };
+          const itemsMap = {};
+          updatedItems.forEach((u) => {
+            itemsMap[u.id] = u;
+          });
+
+          next[activeCategory] = next[activeCategory].map((item) =>
+            itemsMap[item.id] ? itemsMap[item.id] : item,
+          );
+          return next;
+        });
+
+        alert(
+          `✓ AI analysis complete for ${updatedItems.length} item(s)!`,
+        );
+        setSelectedItems([]);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(
+          "AI analysis failed: " + (err.detail || "Unknown error"),
+        );
+      }
+    } catch (err) {
+      console.error("AI analysis error:", err);
+      alert("Error during AI analysis: " + err.message);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleManualAnalysis = async () => {
@@ -487,9 +531,12 @@ export default function MyWardrobe() {
                   }}
                   style={{
                     ...toggleBtnStyle,
-                    background: item.image_analysis
-                      ? "rgba(240, 240, 240, 0.95)"
-                      : "rgba(193, 190, 212, 0.9)",
+                    background:
+                      item.image_analysis &&
+                        typeof item.image_analysis === "object" &&
+                        Object.keys(item.image_analysis).length > 0
+                        ? "rgba(206, 200, 243, 0.9)"
+                        : "rgba(247, 247, 247, 0.95)",
                   }}
                   title="Toggle original/clean view"
                 >
@@ -880,13 +927,13 @@ const toggleBtnStyle = {
   background: "rgba(255, 255, 255, 0.9)",
   border: "none",
   borderRadius: "50%",
-  width: "36px",
-  height: "36px",
+  width: "28px",
+  height: "28px",
   cursor: "pointer",
   display: "flex",
   justifyContent: "center",
   alignItems: "center",
-  fontSize: "18px",
+  fontSize: "14px",
   boxShadow: "0 2px 6px rgba(0,0,0,0.15)",
 };
 

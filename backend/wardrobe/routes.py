@@ -176,3 +176,53 @@ def remove_background_batch(
         )
         for item in processed_items
     ]
+
+
+@router.post("/ai-analyze", response_model=List[WardrobeItemResponse])
+async def ai_analyze_batch(
+    request: BatchProcessRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Batch analyze wardrobe items using Gemini AI vision."""
+    from wardrobe.services import analyze_clothing_image
+
+    items = db.query(WardrobeItem).filter(
+        WardrobeItem.id.in_(request.item_ids),
+        WardrobeItem.user_id == user_id
+    ).all()
+
+    if not items:
+        raise HTTPException(status_code=404, detail="No items found to analyze")
+
+    analyzed_items = []
+    for item in items:
+        # Prefer bg-removed image for cleaner analysis, fall back to original
+        if item.bg_removed_filename:
+            image_path = os.path.join(UPLOADS_DIR, item.bg_removed_filename)
+        else:
+            image_path = os.path.join(UPLOADS_DIR, item.filename)
+
+        if not os.path.exists(image_path):
+            continue
+
+        try:
+            analysis = await analyze_clothing_image(image_path)
+            item.image_analysis = analysis
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"AI analysis failed for item {item.id}: {str(e)}")
+
+        analyzed_items.append(item)
+
+    db.commit()
+
+    return [
+        WardrobeItemResponse(
+            id=item.id,
+            category=item.category,
+            image_url=f"/uploads/{item.filename}",
+            bg_removed_image_url=f"/uploads/{item.bg_removed_filename}" if item.bg_removed_filename else None,
+            image_analysis=item.image_analysis
+        )
+        for item in analyzed_items
+    ]
