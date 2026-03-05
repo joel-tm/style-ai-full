@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.utils import get_openapi
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
@@ -27,6 +28,29 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # --- App ---
 app = FastAPI(title="Style-AI Backend", version="1.0.0")
+
+# --- OpenAPI Security Scheme (for Swagger docs) ---
+# This tells Swagger to prompt for Authorization and send it as an HTTP header.
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="Style-AI Backend",
+        version="1.0.0",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": "Enter a user ID (e.g. 2) or JWT token. When DISABLE_AUTH_IN_DOCS=true, a plain numeric ID is accepted.",
+        }
+    }
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # --- CORS ---
 app.add_middleware(
