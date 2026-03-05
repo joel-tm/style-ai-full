@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict, Any, Optional
 import os
 import uuid
 import shutil
@@ -11,7 +11,7 @@ import rembg
 from database import get_db
 from user.auth import get_current_user_id
 from wardrobe.models import WardrobeItem
-from wardrobe.schemas import WardrobeItemResponse, BatchProcessRequest
+from wardrobe.schemas import WardrobeItemResponse, BatchProcessRequest, ImageAnalysisData
 
 router = APIRouter(prefix="/api/wardrobe", tags=["Wardrobe"])
 
@@ -49,7 +49,7 @@ def upload_wardrobe_item(
     db.commit()
     db.refresh(item)
 
-    return WardrobeItemResponse(id=item.id, category=item.category, image_url=f"/uploads/{item.filename}")
+    return WardrobeItemResponse(id=item.id, category=item.category, image_url=f"/uploads/{item.filename}", image_analysis=item.image_analysis)
 
 
 @router.get("", response_model=List[WardrobeItemResponse])
@@ -64,7 +64,8 @@ def get_wardrobe_items(
             id=item.id,
             category=item.category,
             image_url=f"/uploads/{item.filename}",
-            bg_removed_image_url=f"/uploads/{item.bg_removed_filename}" if item.bg_removed_filename else None
+            bg_removed_image_url=f"/uploads/{item.bg_removed_filename}" if item.bg_removed_filename else None,
+            image_analysis=item.image_analysis
         )
         for item in items
     ]
@@ -94,6 +95,32 @@ def delete_wardrobe_item(
     db.delete(item)
     db.commit()
     return {"detail": "Item deleted"}
+
+
+@router.put("/{item_id}/image-analysis", response_model=WardrobeItemResponse)
+def update_image_analysis(
+    item_id: int,
+    analysis_data: Dict[str, Any],
+    user_id: int = Depends(get_current_user_id),
+    db: Session = Depends(get_db),
+):
+    """Update image analysis data for a wardrobe item."""
+    item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id, WardrobeItem.user_id == user_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Store the analysis data as JSON
+    item.image_analysis = analysis_data
+    db.commit()
+    db.refresh(item)
+
+    return WardrobeItemResponse(
+        id=item.id,
+        category=item.category,
+        image_url=f"/uploads/{item.filename}",
+        bg_removed_image_url=f"/uploads/{item.bg_removed_filename}" if item.bg_removed_filename else None,
+        image_analysis=item.image_analysis
+    )
 
 
 @router.post("/remove-background", response_model=List[WardrobeItemResponse])
@@ -144,7 +171,8 @@ def remove_background_batch(
             id=item.id,
             category=item.category,
             image_url=f"/uploads/{item.filename}",
-            bg_removed_image_url=f"/uploads/{item.bg_removed_filename}" if item.bg_removed_filename else None
+            bg_removed_image_url=f"/uploads/{item.bg_removed_filename}" if item.bg_removed_filename else None,
+            image_analysis=item.image_analysis
         )
         for item in processed_items
     ]
