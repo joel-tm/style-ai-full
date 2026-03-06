@@ -24,6 +24,7 @@ from generated_outfit.routes import router as generated_outfit_router
 from location.routes import router as location_router
 from outfit_request.routes import router as outfit_request_router
 from outfit_suggestion.routes import router as outfit_suggestion_router
+from textile_shop.routes import router as textile_shop_router
 from wardrobe.routes import router as wardrobe_router
 from wardrobe_suggestion_history.routes import router as wardrobe_suggestion_history_router
 from weather_data.routes import router as weather_data_router
@@ -82,6 +83,7 @@ app.include_router(outfit_suggestion_router)
 app.include_router(wardrobe_suggestion_history_router)
 app.include_router(outfit_request_router)
 app.include_router(generated_outfit_router)
+app.include_router(textile_shop_router)
 
 # --- Auth Routes ---
 
