@@ -4,9 +4,11 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from generated_outfit.services import create_generated_outfit
-from outfit.services import generate_outfit_image, get_or_create_location, get_or_fetch_weather
+from location.services import get_or_create_location
+from outfit_generation.services import generate_outfit_image
 from outfit_request.models import OutfitRequest
 from user.models import User
+from weather_data.services import get_or_fetch_weather
 
 
 async def ensure_request_weather(db: Session, outfit_request: OutfitRequest) -> OutfitRequest:

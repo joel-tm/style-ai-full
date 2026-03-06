@@ -4,7 +4,8 @@ from typing import Optional
 from pydantic import BaseModel
 
 from generated_outfit.schemas import GeneratedOutfitResponse
-from outfit.schemas import LocationSchema, WeatherDataSchema
+from location.schemas import LocationSchema
+from weather_data.schemas import WeatherDataSchema
 
 
 class OutfitGenerateRequest(BaseModel):

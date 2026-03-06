@@ -1,0 +1,1 @@
+from outfit_generation.services import generate_outfit_image
