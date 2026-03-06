@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { EnvironmentOutlined, StarFilled } from "@ant-design/icons";
 
 export default function TextileShopFinder({ isOpen, onClose }) {
