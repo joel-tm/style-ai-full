@@ -1,10 +1,27 @@
-
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function MainPage() {
   const navigate = useNavigate();
   const userName = localStorage.getItem("userName") || "User";
+
+  const topCards = [
+    {
+      title: "Create Outfit",
+      description: "Let AI style the perfect outfit for you",
+      onClick: () => navigate("/create-outfit"),
+    },
+    {
+      title: "My Wardrobe",
+      description: "View and manage your saved clothes",
+      onClick: () => navigate("/wardrobe"),
+    },
+    {
+      title: "Find Textile Shop Near Me",
+      description: "See nearby textile shops on a dedicated page",
+      onClick: () => navigate("/textile-shops"),
+    },
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -19,7 +36,9 @@ export default function MainPage() {
       <div style={mainTitle}>
         <div style={headerRow}>
           <h1 style={mainTitleStyle}>Welcome, {userName} 👋</h1>
-          <button onClick={handleLogout} style={logoutBtn}>Logout</button>
+          <button onClick={handleLogout} style={logoutBtn}>
+            Logout
+          </button>
         </div>
       </div>
 
@@ -29,27 +48,12 @@ export default function MainPage() {
 
         {/* Options */}
         <div style={optionsContainer}>
-          {/* Left */}
-          <div
-            style={cardStyle}
-            onClick={() => navigate("/create-outfit")}
-          >
-            <h2 style={cardTitle}>Create Outfit</h2>
-            <p style={cardText}>
-              Let AI style the perfect outfit for you
-            </p>
-          </div>
-
-          {/* Right */}
-          <div
-            style={cardStyle}
-            onClick={() => navigate("/wardrobe")}
-          >
-            <h2 style={cardTitle}>My Wardrobe</h2>
-            <p style={cardText}>
-              View and manage your saved clothes
-            </p>
-          </div>
+          {topCards.map((card) => (
+            <div key={card.title} style={cardStyle} onClick={card.onClick}>
+              <h2 style={cardTitle}>{card.title}</h2>
+              <p style={cardText}>{card.description}</p>
+            </div>
+          ))}
         </div>
 
         {/* Suggest Outfit Section */}
@@ -126,6 +130,8 @@ const titleStyle = {
 const optionsContainer = {
   display: "flex",
   gap: "40px",
+  flexWrap: "wrap",
+  justifyContent: "center",
 };
 
 const cardStyle = {

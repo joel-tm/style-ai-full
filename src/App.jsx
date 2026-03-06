@@ -7,6 +7,7 @@ import CreateOutfit from "./Components/pages/CreateOutfit";
 import OutfitDetail from "./Components/pages/OutfitDetail";
 import SuggestOutfit from "./Components/pages/SuggestOutfit";
 import SuggestionDetail from "./Components/pages/SuggestionDetail";
+import TextileShopPage from "./Components/pages/TextileShopPage";
 import Register from "./Components/Register/Register";
 import Login from "./Components/login/Login";
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <Route path="/home" element={<MainPage />} />
         <Route path="/wardrobe" element={<MyWardrobe />} />
         <Route path="/create-outfit" element={<CreateOutfit />} />
+        <Route path="/textile-shops" element={<TextileShopPage />} />
         <Route path="/outfit/:id" element={<OutfitDetail />} />
         <Route path="/suggest-outfit" element={<SuggestOutfit />} />
         <Route
