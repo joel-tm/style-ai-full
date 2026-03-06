@@ -1,0 +1,1 @@
+from generated_outfit.models import GeneratedOutfit
