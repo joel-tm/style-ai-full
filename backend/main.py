@@ -15,8 +15,18 @@ from user.auth import hash_password, verify_password, create_access_token
 
 # Import wardrobe and outfit models so their tables get created
 from wardrobe.models import WardrobeItem  # noqa: F401
-from outfit.models import OutfitRequest  # noqa: F401
+from generated_outfit.models import GeneratedOutfit  # noqa: F401
+from location.models import Location  # noqa: F401
+from outfit_request.models import OutfitRequest  # noqa: F401
+from wardrobe_suggestion_history.models import WardrobeSuggestionHistory  # noqa: F401
+from weather_data.models import WeatherData  # noqa: F401
+from generated_outfit.routes import router as generated_outfit_router
+from location.routes import router as location_router
+from outfit_request.routes import router as outfit_request_router
+from outfit_suggestion.routes import router as outfit_suggestion_router
 from wardrobe.routes import router as wardrobe_router
+from wardrobe_suggestion_history.routes import router as wardrobe_suggestion_history_router
+from weather_data.routes import router as weather_data_router
 
 # --- Create all tables ---
 Base.metadata.create_all(bind=engine)
@@ -65,9 +75,13 @@ app.add_middleware(
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
 # --- Include routers ---
-from outfit.routes import router as outfit_router
 app.include_router(wardrobe_router)
-app.include_router(outfit_router)
+app.include_router(location_router)
+app.include_router(weather_data_router)
+app.include_router(outfit_suggestion_router)
+app.include_router(wardrobe_suggestion_history_router)
+app.include_router(outfit_request_router)
+app.include_router(generated_outfit_router)
 
 # --- Auth Routes ---
 

@@ -1,1 +1,1 @@
-from wardrobe_suggestion_history.routes import router
+"""Wardrobe suggestion history package."""
