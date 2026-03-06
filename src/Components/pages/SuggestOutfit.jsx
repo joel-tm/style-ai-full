@@ -117,6 +117,14 @@ export default function SuggestOutfit() {
           country,
           state: place,
           target_date: date ? date.format("YYYY-MM-DD") : null,
+          latitude: (() => {
+            const s = states.find((st) => st.name === place);
+            return s?.latitude ? parseFloat(s.latitude) : null;
+          })(),
+          longitude: (() => {
+            const s = states.find((st) => st.name === place);
+            return s?.longitude ? parseFloat(s.longitude) : null;
+          })(),
         }),
       });
 
