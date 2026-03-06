@@ -1,11 +1,14 @@
 from datetime import date
 from typing import List, Optional
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from outfit.schemas import LocationSchema, WardrobeItemBrief, WeatherDataSchema
+from location.schemas import LocationSchema
+from outfit_suggestion.schemas import WardrobeItemBrief
 from wardrobe_suggestion_history.models import WardrobeSuggestionHistory
 from wardrobe_suggestion_history.schemas import WardrobeSuggestionHistoryResponse
+from weather_data.schemas import WeatherDataSchema
 
 
 def serialize_suggestion_history(history_item: WardrobeSuggestionHistory) -> WardrobeSuggestionHistoryResponse:
@@ -27,6 +30,21 @@ def list_suggestion_history(db: Session, user_id: int) -> List[WardrobeSuggestio
         WardrobeSuggestionHistory.user_id == user_id
     ).order_by(WardrobeSuggestionHistory.created_at.desc()).all()
     return [serialize_suggestion_history(item) for item in history_items]
+
+
+def get_suggestion_history_by_id(
+    db: Session,
+    *,
+    user_id: int,
+    suggestion_id: int,
+) -> WardrobeSuggestionHistoryResponse:
+    history_item = db.query(WardrobeSuggestionHistory).filter(
+        WardrobeSuggestionHistory.id == suggestion_id,
+        WardrobeSuggestionHistory.user_id == user_id,
+    ).first()
+    if not history_item:
+        raise HTTPException(status_code=404, detail="Suggested outfit not found")
+    return serialize_suggestion_history(history_item)
 
 
 def create_suggestion_history_entry(

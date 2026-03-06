@@ -28,6 +28,9 @@ export default function SuggestOutfit() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [suggestion, setSuggestion] = useState(null);
+  const [suggestionHistory, setSuggestionHistory] = useState([]);
+  const [showHistory, setShowHistory] = useState(true);
+  const [hiddenCards, setHiddenCards] = useState(new Set());
   const [errorMsg, setErrorMsg] = useState("");
   const [wardrobeItems, setWardrobeItems] = useState([]);
 
@@ -49,7 +52,25 @@ export default function SuggestOutfit() {
         console.error("Failed to load wardrobe", err);
       }
     };
-    if (token) fetchWardrobe();
+
+    const fetchSuggestionHistory = async () => {
+      try {
+        const res = await fetch("/api/outfit/suggest-history", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestionHistory(data);
+        }
+      } catch (err) {
+        console.error("Failed to load suggestion history", err);
+      }
+    };
+
+    if (token) {
+      fetchWardrobe();
+      fetchSuggestionHistory();
+    }
   }, [token]);
 
   const allowedCountries = useMemo(() => {
@@ -106,12 +127,36 @@ export default function SuggestOutfit() {
 
       const data = await res.json();
       setSuggestion(data);
+      try {
+        const historyRes = await fetch("/api/outfit/suggest-history", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (historyRes.ok) {
+          const historyData = await historyRes.json();
+          setSuggestionHistory(historyData);
+        }
+      } catch (historyErr) {
+        console.error("Failed to refresh suggestion history", historyErr);
+      }
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const toggleCardVisibility = (id, event) => {
+    event.stopPropagation();
+    setHiddenCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   // Group wardrobe items by category for display
@@ -254,7 +299,7 @@ export default function SuggestOutfit() {
                 textAlign: "center",
               }}
             >
-              ✨ Suggested Outfit
+              Suggested Outfit
             </h3>
 
             {suggestion.weather && (
@@ -291,16 +336,12 @@ export default function SuggestOutfit() {
                           alt={item.category}
                           style={suggestedItemImage}
                         />
-                        <p
-                          style={{
-                            margin: "8px 0 0",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            textAlign: "center",
-                          }}
-                        >
-                          {item.category}
-                        </p>
+                        <div style={suggestedItemMetaStyle}>
+                          <p style={suggestedItemTitleStyle}>{item.category}</p>
+                          <span style={suggestedItemIdStyle}>
+                            Item #{item.id}
+                          </span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -309,6 +350,97 @@ export default function SuggestOutfit() {
           </div>
         )}
       </div>
+
+      {suggestionHistory.length > 0 && (
+        <div style={historySectionStyle}>
+          <div style={historyHeaderStyle}>
+            <h2 style={{ fontSize: "24px", margin: 0, color: "#111" }}>
+              Past Suggested Outfits
+            </h2>
+            <button
+              style={toggleBtnStyle}
+              onClick={() => setShowHistory((prev) => !prev)}
+            >
+              {showHistory ? "Hide All ▲" : "Show All ▼"}
+            </button>
+          </div>
+
+          {showHistory && (
+            <div style={historyGridStyle}>
+              {suggestionHistory.map((item) => {
+                const isHidden = hiddenCards.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    style={{
+                      ...historyCardStyle,
+                      opacity: isHidden ? 0.45 : 1,
+                      cursor: isHidden ? "default" : "pointer",
+                    }}
+                    onClick={() =>
+                      !isHidden &&
+                      navigate(`/suggest-outfit/history/${item.id}`)
+                    }
+                  >
+                    <button
+                      style={cardToggleBtnStyle}
+                      onClick={(event) => toggleCardVisibility(item.id, event)}
+                      title={isHidden ? "Show card" : "Hide card"}
+                    >
+                      {isHidden ? "👁️" : "✕"}
+                    </button>
+
+                    {!isHidden && item.selected_items?.length > 0 && (
+                      <div style={historySelectedGridStyle}>
+                        {item.selected_items.slice(0, 3).map((selectedItem) => (
+                          <img
+                            key={`${item.id}-${selectedItem.id}`}
+                            src={`http://localhost:8000${selectedItem.bg_removed_image_url || selectedItem.image_url}`}
+                            alt={selectedItem.category}
+                            style={historySelectedImageStyle}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ padding: "14px" }}>
+                      <p
+                        style={{
+                          margin: "0 0 6px",
+                          fontWeight: 600,
+                          fontSize: "16px",
+                          color: isHidden ? "#aaa" : "#111",
+                        }}
+                      >
+                        {item.occasion}
+                      </p>
+                      {!isHidden && (
+                        <>
+                          <p style={historyMetaTextStyle}>
+                            📍 {item.location.state}, {item.location.country}
+                          </p>
+                          <p style={historyMetaTextStyle}>
+                            📅 {item.target_date}
+                          </p>
+                          {item.weather && (
+                            <p style={historyWeatherTextStyle}>
+                              🌤️ {item.weather.weather_condition} ·{" "}
+                              {item.weather.temperature_avg.toFixed(1)}°C
+                            </p>
+                          )}
+                          <p style={historySuggestionStyle}>
+                            {item.suggestion}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -329,6 +461,8 @@ const topRowStyle = {
   display: "flex",
   justifyContent: "center",
   alignItems: "flex-start",
+  flexWrap: "wrap",
+  gap: "24px",
   width: "100%",
   maxWidth: "1400px",
 };
@@ -337,7 +471,9 @@ const cardStyle = {
   background: "#ffffff",
   padding: "40px",
   borderRadius: "18px",
-  width: "660px",
+  width: "100%",
+  maxWidth: "660px",
+  flex: "1 1 520px",
   boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
 };
 
@@ -394,9 +530,10 @@ const resultsCardStyle = {
   background: "#ffffff",
   padding: "40px",
   borderRadius: "18px",
-  width: "660px",
+  width: "100%",
+  maxWidth: "660px",
+  flex: "1 1 520px",
   boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
-  marginLeft: "24px",
   display: "flex",
   flexDirection: "column",
 };
@@ -419,22 +556,139 @@ const suggestionTextStyle = {
   color: "#333",
 };
 
+const historySectionStyle = {
+  width: "100%",
+  maxWidth: "1400px",
+  marginTop: "40px",
+};
+
+const historyGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+  gap: "20px",
+};
+
+const historyCardStyle = {
+  background: "#fff",
+  borderRadius: "14px",
+  overflow: "hidden",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.08)",
+  transition: "transform 0.2s, box-shadow 0.2s, opacity 0.3s",
+  position: "relative",
+};
+
+const historyHeaderStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+};
+
+const toggleBtnStyle = {
+  background: "#6c5ce7",
+  color: "#fff",
+  border: "none",
+  borderRadius: "8px",
+  padding: "8px 16px",
+  fontSize: "13px",
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const cardToggleBtnStyle = {
+  position: "absolute",
+  top: "8px",
+  right: "8px",
+  background: "rgba(0,0,0,0.5)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "50%",
+  width: "28px",
+  height: "28px",
+  fontSize: "14px",
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 2,
+};
+
 const suggestedItemsGrid = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-  gap: "12px",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: "18px",
 };
 
 const suggestedItemCard = {
-  background: "#f8f8f8",
-  borderRadius: "10px",
-  padding: "8px",
+  background: "linear-gradient(180deg, #fafafa 0%, #f1f4f7 100%)",
+  borderRadius: "16px",
+  padding: "14px",
   overflow: "hidden",
+  boxShadow: "0 8px 20px rgba(0,0,0,0.08)",
 };
 
 const suggestedItemImage = {
   width: "100%",
-  aspectRatio: "1/1",
+  aspectRatio: "4/5",
   objectFit: "cover",
-  borderRadius: "8px",
+  borderRadius: "12px",
+};
+
+const suggestedItemMetaStyle = {
+  marginTop: "12px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "4px",
+};
+
+const suggestedItemTitleStyle = {
+  margin: 0,
+  fontSize: "15px",
+  fontWeight: 700,
+  textAlign: "center",
+  color: "#111",
+};
+
+const suggestedItemIdStyle = {
+  fontSize: "12px",
+  color: "#666",
+  textAlign: "center",
+};
+
+const historySelectedGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, 1fr)",
+  gap: "8px",
+  padding: "12px 12px 0",
+};
+
+const historySelectedImageStyle = {
+  width: "100%",
+  aspectRatio: "4/5",
+  objectFit: "cover",
+  borderRadius: "10px",
+  background: "#f4f4f4",
+};
+
+const historyMetaTextStyle = {
+  margin: "0 0 6px",
+  fontSize: "13px",
+  color: "#555",
+};
+
+const historyWeatherTextStyle = {
+  margin: "0 0 10px",
+  fontSize: "12px",
+  color: "#888",
+};
+
+const historySuggestionStyle = {
+  margin: 0,
+  fontSize: "13px",
+  color: "#333",
+  lineHeight: "1.5",
+  display: "-webkit-box",
+  WebkitLineClamp: 4,
+  WebkitBoxOrient: "vertical",
+  overflow: "hidden",
 };

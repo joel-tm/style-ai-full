@@ -3,7 +3,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from outfit.schemas import LocationSchema, WardrobeItemBrief, WeatherDataSchema
+from location.schemas import LocationSchema
+from outfit_suggestion.schemas import WardrobeItemBrief
+from weather_data.schemas import WeatherDataSchema
 
 
 class WardrobeSuggestionHistoryResponse(BaseModel):
