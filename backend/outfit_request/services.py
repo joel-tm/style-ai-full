@@ -36,8 +36,8 @@ def get_user_style_profile(db: Session, user_id: int) -> tuple[str, int | None]:
     return gender, age
 
 
-async def create_outfit_request_with_generation(db: Session, user_id: int, occasion: str, country: str, state: str, target_date: date) -> OutfitRequest:
-    location = await get_or_create_location(db, country, state)
+async def create_outfit_request_with_generation(db: Session, user_id: int, occasion: str, country: str, state: str, target_date: date, latitude: float | None = None, longitude: float | None = None) -> OutfitRequest:
+    location = await get_or_create_location(db, country, state, latitude, longitude)
     weather = await get_or_fetch_weather(db, location, target_date)
 
     outfit_request = OutfitRequest(

@@ -1,14 +1,15 @@
+import os
+
 import httpx
 
 from location.models import Location
 from sqlalchemy.orm import Session
 
 
-async def get_or_create_location(db: Session, country: str, state: str) -> Location:
-    location = db.query(Location).filter(Location.country == country, Location.state == state).first()
-    if location:
-        return location
+GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
+
+def _country_display_name(country: str) -> str:
     iso_to_name = {
         "AE": "United Arab Emirates",
         "SA": "Saudi Arabia",
@@ -22,37 +23,60 @@ async def get_or_create_location(db: Session, country: str, state: str) -> Locat
         "HK": "Hong Kong",
         "IN": "India",
     }
-    country_name = iso_to_name.get(country, country)
+    return iso_to_name.get(country.upper(), country)
 
-    query = f"{state} {country_name}"
-    url = "https://geocoding-api.open-meteo.com/v1/search"
-    params = {"name": query, "count": 1, "language": "en", "format": "json"}
 
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params)
+async def _geocode_location(country: str, state: str) -> tuple[float, float]:
+    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        raise ValueError("GOOGLE_MAPS_API_KEY environment variable is missing.")
+
+    country_name = _country_display_name(country)
+    params = {
+        "address": f"{state}, {country_name}",
+        "key": api_key,
+    }
+
+    country_code = country.strip().upper()
+    if len(country_code) == 2:
+        params["components"] = f"country:{country_code}"
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(GOOGLE_GEOCODING_URL, params=params)
         data = response.json()
 
-        if not data.get("results"):
-            params["name"] = state
-            response = await client.get(url, params=params)
-            data = response.json()
+    if data.get("status") != "OK" or not data.get("results"):
+        raise ValueError(f"Could not geolocate the provided country/state: {state}, {country_name}")
 
-            if not data.get("results"):
-                params["name"] = country
-                response = await client.get(url, params=params)
-                data = response.json()
+    result = data["results"][0]
+    geometry = result.get("geometry", {}).get("location", {})
+    latitude = geometry.get("lat")
+    longitude = geometry.get("lng")
+    if latitude is None or longitude is None:
+        raise ValueError(f"Geocoding response missing coordinates for: {state}, {country_name}")
 
-                if not data.get("results"):
-                    raise ValueError(f"Could not geolocate the provided country/state: {query}")
+    return latitude, longitude
 
-        result = data["results"][0]
-        new_location = Location(
-            country=country,
-            state=state,
-            latitude=result["latitude"],
-            longitude=result["longitude"],
-        )
-        db.add(new_location)
+
+async def get_or_create_location(db: Session, country: str, state: str, latitude: float | None = None, longitude: float | None = None) -> Location:
+    if latitude is None or longitude is None:
+        latitude, longitude = await _geocode_location(country, state)
+
+    location = db.query(Location).filter(Location.country == country, Location.state == state).first()
+    if location:
+        location.latitude = latitude
+        location.longitude = longitude
         db.commit()
-        db.refresh(new_location)
-        return new_location
+        db.refresh(location)
+        return location
+
+    new_location = Location(
+        country=country,
+        state=state,
+        latitude=latitude,
+        longitude=longitude,
+    )
+    db.add(new_location)
+    db.commit()
+    db.refresh(new_location)
+    return new_location

@@ -25,7 +25,7 @@ async def preview_weather(
 ):
     target_date = req.target_date or date.today()
     try:
-        location = await get_or_create_location(db, req.country, req.state)
+        location = await get_or_create_location(db, req.country, req.state, req.latitude, req.longitude)
         weather = await get_or_fetch_weather(db, location, target_date)
         result = WeatherDataSchema.model_validate(weather)
         if getattr(weather, "_using_defaults", False):
@@ -47,7 +47,7 @@ async def suggest_from_wardrobe_route(
     target_date = req.target_date or date.today()
 
     try:
-        location = await get_or_create_location(db, req.country, req.state)
+        location = await get_or_create_location(db, req.country, req.state, req.latitude, req.longitude)
         weather = await get_or_fetch_weather(db, location, target_date)
 
         items = db.query(WardrobeItem).filter(WardrobeItem.user_id == user_id).all()

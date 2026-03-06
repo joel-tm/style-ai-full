@@ -13,6 +13,8 @@ class OutfitGenerateRequest(BaseModel):
     country: str
     state: str
     target_date: Optional[date] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 class OutfitRequestResponse(BaseModel):

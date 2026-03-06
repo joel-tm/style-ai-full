@@ -28,6 +28,8 @@ async def generate_outfit(
             country=req.country,
             state=req.state,
             target_date=target_date,
+            latitude=req.latitude,
+            longitude=req.longitude,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Outfit generation failed: {str(e)}")
